@@ -1,5 +1,6 @@
 (define-module dsm.server
   (extend dsm.dsm)
+  (use srfi-1)
   (use srfi-13)
   (use util.queue)
   (use gauche.collection)
@@ -80,15 +81,47 @@
 (define-method get-by-id ((self <dsm-server>) id)
   (id-ref (marshal-table-of self) id))
 
-(define dsm-thread-disable #t);(eq? 'none (gauche-thread-type)))
+(define dsm-thread-disable (eq? 'none (gauche-thread-type)))
 
 (define-class <thread-pool> ()
   ((pool :accessor pool-of :init-form '())
    (max :accessor max-of :init-value 10 :init-keyword :max)
    (mutex :accessor mutex-of :init-form (make-mutex))
+   (job-queue :accessor job-queue-of :init-form (make-queue))
+   (dirty :accessor dirty-of :init-value 0)
    (keeper :accessor keeper-of)))
 
+(define (thread-join-with-error-handling thunk)
+  (with-error-handler
+      (lambda (e)
+        (raise (if (uncaught-exception? e)
+                 (uncaught-exception-reason e)
+                 e)))
+    thunk))
+
 (define-method initialize ((self <thread-pool>) args)
+  (define mark (gensym))
+  (define (update-pool!)
+    (mutex-synchronize
+     (mutex-of self)
+     (lambda ()
+       (let ((new-pool
+              (if (queue-empty? (job-queue-of self))
+                (fold (lambda (work-thread prev)
+                        (if (eq? mark
+                                 (thread-join-with-error-handling
+                                  (lambda ()
+                                    (thread-join! (thread-of work-thread)
+                                                  0.0 mark))))
+                          (cons work-thread prev)
+                          (begin
+                            (print "terminate")
+                            prev)))
+                      '()
+                      (pool-of self))
+                (pool-of self))))
+         (set! (pool-of self) new-pool)))))
+
   (next-method)
   (set! (keeper-of self)
         (if dsm-thread-disable
@@ -97,27 +130,12 @@
            (make-thread
             (lambda ()
               (let loop ()
-                (print (current-time))
                 (thread-sleep! 30)
-                ;; (sys-sleep 30)
-                (print (current-time))
-                (mutex-synchronize
-                 (mutex-of self)
-                 (lambda ()
-                   (let ((new-pool
-                          (fold (lambda (work-thread prev)
-                                  (thread-join! (thread-of work-thread) 0.0 #f)
-                                  (cond ((free? work-thread)
-                                         (thread-terminate!
-                                          (thread-of work-thread))
-                                         (print "terninate")
-                                         prev)
-                                        (else
-                                         (cons work-thread prev))))
-                                '()
-                                (pool-of self))))
-                     (set! (pool-of self) new-pool))))
-                (print (current-time))
+                ;; (p (length (pool-of self)))
+                ;; (p (count free? (pool-of self)))
+                ;; (p (queue-length (job-queue-of self)))
+                (update-pool!)
+                (thread-yield!)
                 (loop)))
             "keeper")))))
 
@@ -125,11 +143,34 @@
   (if (keeper-of self)
     (apply thread-join! (keeper-of self) args)))
 
+(define-method dirty! ((self <thread-pool>))
+  (mutex-synchronize
+   (mutex-of self)
+   (lambda ()
+     (inc! (dirty-of self)))))
+
+(define-method reset-dirty! ((self <thread-pool>))
+  (mutex-synchronize
+   (mutex-of self)
+   (lambda ()
+     (set! (dirty-of self) 0))))
+
+(define-method too-dirty? ((self <thread-pool>))
+  (> (dirty-of self)
+     (/ (max-of self) 2)))
+
 (define-method thread-pool-push! ((self <thread-pool>) thunk)
   (if dsm-thread-disable
     (thunk)
-    (let ((work-thread (thread-pool-work-thread self)))
-      (add-job! work-thread thunk))))
+    (begin
+      (dirty! self)
+      (add-work-thread-if-need self)
+      (add-job! self thunk)
+      '(when (too-dirty? self)
+        ;; (p "DIRTY!!!")
+        (reset-dirty! self)
+        (thread-yield!))
+      (thread-yield!))))
 
 (define-method safe-pool-of ((self <thread-pool>))
   (mutex-synchronize
@@ -137,77 +178,83 @@
    (lambda ()
      (pool-of self))))
 
-(define-method thread-pool-work-thread ((self <thread-pool>))
-  (let ((work-threads (sort (safe-pool-of self)
-                            (lambda (x y)
-                              (< (job-size x)
-                                 (job-size y))))))
-    (if (or (null? work-threads)
-            (not (free? (car work-threads))))
-      (if (< (length (pool-of self)) (max-of self))
-        (let ((new-work-thread (make <work-thread>
-                                 (length (safe-pool-of self)))))
-          (mutex-synchronize
-           (mutex-of self)
-           (lambda ()
-             (push! (pool-of self) new-work-thread)
-             new-work-thread)))
-        (if (null? work-threads)
-          (error "too many thread in pool")
-          (car work-threads)))
-      (car work-threads))))
-
-(define-class <work-thread> ()
-  ((thread :accessor thread-of)
-   (mutex :accessor mutex-of :init-form (make-mutex))
-   (job-queue :accessor job-queue-of :init-form (make-queue))))
-
-(define-method initialize ((self <work-thread>) args)
-  (next-method)
-  (let ((name-suffix (car args)))
-    (set! (thread-of self)
-          (make-thread
-           (lambda ()
-             (let loop ()
-               (do-next-job! self)
-               (thread-yield!)
-               (loop)))
-           #`"work-thread-,|name-suffix|"))
-    (thread-specific-set! (thread-of self) (job-queue-of self)))
-  (thread-start! (thread-of self)))
-  
-(define-method free? ((self <work-thread>))
+(define-method have-job? ((self <thread-pool>))
   (mutex-synchronize
    (mutex-of self)
    (lambda ()
-     (unsafe-free? self))))
+     (not (queue-empty? (job-queue-of self))))))
 
-(define-method unsafe-free? ((self <work-thread>))
-  (queue-empty? (job-queue-of self)))
-
-(define-method job-size ((self <work-thread>))
+(define-method next-job! ((self <thread-pool>))
   (mutex-synchronize
    (mutex-of self)
    (lambda ()
-     (queue-length (job-queue-of self)))))
+     (if (queue-empty? (job-queue-of self))
+       (lambda () (print "job is nothing"))
+       (dequeue! (job-queue-of self))))))
 
-(define-method add-job! ((self <work-thread>) thunk)
+(define-method add-job! ((self <thread-pool>) thunk)
   (mutex-synchronize
    (mutex-of self)
    (lambda ()
      (enqueue! (job-queue-of self) thunk))))
 
-(define-method next-job! ((self <work-thread>))
-  (dequeue! (job-queue-of self)))
+(define-method add-work-thread-if-need ((self <thread-pool>))
+  (let ((pool-size (length (safe-pool-of self))))
+    (when (< pool-size (max-of self))
+      (let ((new-work-thread (make <work-thread>
+                               :pool self
+                               :name (number->string pool-size))))
+        (mutex-synchronize
+         (mutex-of self)
+         (lambda ()
+           (push! (pool-of self) new-work-thread)))))))
 
-(use gauche.interactive)
-(define-method do-next-job! ((self <work-thread>))
+(define-class <work-thread> ()
+  ((name :accessor name-of :init-keyword :name)
+   (pool :accessor pool-of :init-keyword :pool)
+   (thread :accessor thread-of)
+   (mutex :accessor mutex-of :init-form (make-mutex))))
+
+(define-method initialize ((self <work-thread>) args)
+  (next-method)
+  (set! (thread-of self)
+        (make-thread
+         (lambda ()
+           (call/cc
+            (lambda (cont)
+              (let loop ()
+                (do-next-job! self cont)
+                (thread-yield!)
+                (loop)))))
+         #`"work-thread-,(name-of self)"))
+  (set-working! self #f)
+  (thread-start! (thread-of self)))
+
+(define-method set-working! ((self <work-thread>) bool)
   (mutex-synchronize
    (mutex-of self)
    (lambda ()
-     (unless (unsafe-free? self)
-       ((next-job! self))))))
-   
+     (thread-specific-set! (thread-of self) bool))))
+
+(define-method working? ((self <work-thread>))
+  (thread-specific (thread-of self)))
+
+(define-method free? ((self <work-thread>))
+  (not (working? self)))
+
+(use gauche.interactive)
+(define-method do-next-job! ((self <work-thread>) return)
+  (when (have-job? (pool-of self))
+    (set-working! self #t)
+    ;; (p "DO!!!")
+    (let ((job (next-job! (pool-of self))))
+      (cond ((procedure? job)
+             (job)
+             (set-working! self #f))
+            (else
+             (set-working! self #f)
+             (return #f))))))
+
 (define (mutex-synchronize mutex thunk)
   (dynamic-wind
     (lambda () (mutex-lock! mutex))
@@ -275,17 +322,13 @@
   (if (thread-of server)
     (let ((sym (gensym)))
       (let loop ()
-        (with-error-handler
-            (lambda (e)
-              (if (uncaught-exception? e)
-                (p (ref (uncaught-exception-reason e) 'message))
-                (p (ref e 'message)))
-              (raise e))
-          (lambda ()
-            (if (and (eq? sym (thread-join! (thread-of server) 1.0 sym))
-                     (eq? sym (thread-pool-join! (thread-pool-of server)
-                                                 0.0 sym)))
-              (loop))))))))
+        (thread-join-with-error-handling
+         (lambda ()
+           ;; (p "dsm-server")
+           (if (and (eq? sym (thread-join! (thread-of server) 1.0 sym))
+                    (eq? sym (thread-pool-join! (thread-pool-of server)
+                                                0.0 sym)))
+             (loop))))))))
 
 (define-method dsm-server-start! ((self <dsm-server>) . args)
   (let ((selector (make <selector>))
