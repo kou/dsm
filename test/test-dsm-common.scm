@@ -3,25 +3,26 @@
 (use test.unit)
 
 (define-module test-dsm-common
+  (use rfc.uri)
   (use test.unit)
   (use marshal)
   (use dsm.common))
 
 (select-module test-dsm-common)
-(define (x->dsmp-header->string table obj . others)
-  (with-module dsm.common
-    (apply x->dsmp-header->string table obj others)))
+(define (x->dsm-header->string table obj . others)
+  (with-module dsm.protocol
+    (apply x->dsm-header->string table obj others)))
 
-(define-assertion (assert-dsmp-header header version encoding size command)
+(define-assertion (assert-dsm-header prot header version encoding size command)
   (define (make-message-handler expect type)
     (lambda (actual)
       (format " expected <~s> ~a\n  but was <~s>"
               expect type actual)))
-  (let* ((parsed-header (with-module dsm.common (parse-dsmp-header header)))
-         (header-version (with-module dsm.common (version-of parsed-header)))
-         (header-encoding (with-module dsm.common (encoding-of parsed-header)))
-         (header-size (with-module dsm.common (size-of parsed-header)))
-         (header-command (with-module dsm.common (command-of parsed-header))))
+  (let* ((parsed-header (with-module dsm.protocol (parse-header prot header)))
+         (header-version (with-module dsm.protocol (version-of parsed-header)))
+         (header-encoding (with-module dsm.protocol (encoding-of parsed-header)))
+         (header-size (with-module dsm.protocol (size-of parsed-header)))
+         (header-command (with-module dsm.protocol (command-of parsed-header))))
     (assert-equal header-version version
                   (make-message-handler header-version "version"))
     (assert-equal header-encoding encoding
@@ -33,8 +34,7 @@
     ))
 
 (let ((table #f)
-      (host "localhost")
-      (port 59110))
+      (dsmp (make <dsmp>)))
   (define-test-case "dsm common library test"
     (setup
      (lambda () (set! table (make-marshal-table))))
@@ -47,36 +47,50 @@
                     )
                   :prepare (lambda (item)
                              (list (car item)
-                                   (x->dsmp-header->string table (cdr item)
-                                                           :command "get"))))
-     )
+                                   (x->dsm-header->string dsmp
+                                                          table
+                                                          (cdr item)
+                                                          :command "get")))))
     ("parse-header test"
-     (assert-each assert-dsmp-header
-                  `(("v=1;e=UTF-8;s=1;c=get\n" 1 "UTF-8" 1 "get")
-                    ("version=1;encoding=UTF-8;size=1;command=eval\n"
-                     1 "UTF-8" 1 "eval")
-                    ("v=1.1;e=EUC-JP;s=3;c=get\n" 1.1 "EUC-JP" 3 "get")
-                    ))
-     )
-    ("dsmp-response test"
+     (assert-each assert-dsm-header
+                  `((,dsmp "v=1;e=UTF-8;s=1;c=get\n" 1 "UTF-8" 1 "get")
+                    (,dsmp "version=1;encoding=UTF-8;size=1;command=eval\n"
+                           1 "UTF-8" 1 "eval")
+                    (,dsmp "v=0.9;e=EUC-JP;s=3;c=get\n" 0.9 "EUC-JP" 3 "get"))))
+    ("dsm-response test"
      (assert-each assert-equal
                   `(1 "abc" ,(lambda (x) x))
                   :prepare
                   (lambda (item)
-                    (let ((dsmp-str (string-append
-                                     (x->dsmp-header->string table item
-                                                             :command
-                                                             "response")
-                                     "\n"
-                                     (marshal table item))))
-                      (list dsmp-str
-                            (let ((in (open-input-string dsmp-str))
+                    (let ((dsm-str (string-append
+                                    (x->dsm-header->string dsmp
+                                                           table item
+                                                           :command
+                                                           "response")
+                                    "\n"
+                                    (marshal table item))))
+                      (list dsm-str
+                            (let ((in (open-input-string dsm-str))
                                   (out (open-output-string)))
-                              (dsmp-response table
-                                             in out
-                                             :response-handler
-                                             (lambda (body)
-                                               (unmarshal table body)))
+                              (dsm-response dsmp
+                                            table
+                                            in out
+                                            :response-handler
+                                            (lambda (body)
+                                              (unmarshal table body)))
                               (get-output-string out))))))
      )
-    ))
+    ("pares-uri test"
+     (assert-each (lambda (excepted uri)
+                    (receive all (parse-uri uri)
+                      (assert-equal excepted all)))
+                  `(((dsmp #f "localhost" 6789 #f #f #f)
+                     "dsmp://localhost:6789")
+                    ((dsmp #f #f 6789 #f #f #f)
+                     "dsmp://:6789")
+                    ((#f #f #f 6789 #f #f #f)
+                     "//:6789")
+                    ((http #f "example.com" 12345 "/" #f #f)
+                     ,(uri-compose :scheme "http"
+                                   :host "example.com"
+                                   :port 12345)))))))

@@ -10,16 +10,16 @@
   (use dsm.common)
   (export make-dsm-server start-dsm-server stop-dsm-server
           dsm-server-join!
-          socket-of
+          port-of path-of
           add-mount-point! get-by-mount-point get-by-id
           require-in-root-thread required-in-root-thread?)
   )
 (select-module dsm.server)
 
 (define-class <dsm-server> ()
-  ((host :init-keyword :host :accessor host-of :init-value #f)
-   (port :init-keyword :port :accessor port-of :init-value 59102)
+  ((uri :init-keyword :uri :accessor uri-of)
    (socket :accessor socket-of)
+   (protocol :accessor protocol-of)
    (thread :accessor thread-of)
    (mount-table :accessor mount-table-of
                 :init-form (make-hash-table 'string=?))
@@ -31,13 +31,36 @@
 
 (define-method initialize ((self <dsm-server>) args)
   (next-method)
-  (set! (socket-of self)
-        (make-server-socket 'inet
-                            (port-of self)
-                            :reuse-addr? #t)))
+  (receive (scheme user-info host port path query fragment)
+      (parse-uri (uri-of self))
+    (unless scheme
+      (error "scheme isn't specified."))
+    (set! (socket-of self)
+          (apply make-server-socket
+                 (case scheme
+                   ((dsmp http) (list 'inet (or port 0) :reuse-addr? #t))
+                   ((unix) (list 'unix path))
+                   (else (error "unknown scheme: " scheme)))))
+    (set! (protocol-of self)
+          (case scheme
+            ((dsmp unix) (make <dsmp>))
+            ((http) (make <dsmp-over-http>))
+            (else (error "unknown scheme: " scheme))))))
 
-(define (make-dsm-server . keywords)
-  (apply make <dsm-server> keywords))
+(define-method port-of ((self <dsm-server>))
+  (let ((addr (socket-address (socket-of self))))
+    (if (eq? 'unix (sockaddr-family))
+      #f
+      (sockaddr-port addr))))
+
+(define-method path-of ((self <dsm-server>))
+  (let ((addr (socket-address (socket-of self))))
+    (if (eq? 'unix (sockaddr-family))
+      (sockaddr-name addr)
+      #f)))
+
+(define (make-dsm-server uri . keywords)
+  (apply make <dsm-server> (append (list :uri uri) keywords)))
 
 (define-method add-mount-point! ((self <dsm-server>) mount-point value)
   (hash-table-put! (mount-table-of self)
@@ -156,11 +179,12 @@
          (mutex-synchronize
           (dsm-thread-mutex-get client)
           (lambda ()
-            (dsmp-response (marshal-table-of self)
-                           input output
-                           :get-handler (cut get-by-mount-point self <>)
-                           :eof-handler (cut (make-eof-handler cont)
-                                             client input output)))))))
+            (dsm-response (protocol-of self)
+                          (marshal-table-of self)
+                          input output
+                          :get-handler (cut get-by-mount-point self <>)
+                          :eof-handler (cut (make-eof-handler cont)
+                                            client input output)))))))
     
     (define (make-eof-handler return)
       (lambda (client input output)

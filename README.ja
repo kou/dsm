@@ -14,23 +14,37 @@ GPL or BSD License
 
 == メーリングリスト
 
-((<COZMIXNG RWiki - 連絡先|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=%CF%A2%CD%ED%C0%E8>))を御覧下さい．
+((<COZMIXNG RWiki - 連絡先
+|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=%CF%A2%CD%ED%C0%E8>))
+を御覧下さい．
 
 == なにこれ？
 
-((<marshal|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=marshal>))を用いたサーバ/クライアント方式の簡易分散Schemeライブラリです．
+((<marshal|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=marshal>))
+を用いたサーバ/クライアント方式の簡易分散Schemeライブラリで
+す．
 
 以下のような機能があります．
 
   * リモートオブジェクトのコピーを取得する．
   * ローカルオブジェクトを引数としてリモートの手続き/マク
     ロにリモートで適用する．
-  * リモートの手続き/マクロをリモートで適用した際に発生した
+  * リモートの手続き／マクロをリモートで適用した際に発生した
     エラーをローカルに転送する．
 
 以下のような機能はありません．
 
-  * リモートの手続き/マクロをローカルで適用する．
+  * リモートの手続き／マクロをローカルで適用する．
+
+== 入手方法
+
+((<URL:http://www.cozmixng.org/~kou/download/dsm.tar.gz>))
+
+  % svn co http://www.cozmixng.org/repos/gauche/dsm/trunk dsm
+
+== インストール
+
+  # gosh install/install.scm
 
 == 構造
 
@@ -46,7 +60,7 @@ dsmはオブジェクトを以下のように扱います．
   * read/writeできないオブジェクトはそのオブジェクトの参照が
     渡される．
 
-例として，以下のようなサーバ/クライアントを考えます．
+例として，以下のようなサーバ／クライアントを考えます．
 
 サーバ: "/map"というマウントポイントにmap手続きをマウントし
 ている．
@@ -105,7 +119,7 @@ dsmはオブジェクトを以下のように扱います．
   (use dsm.server)
 
   (define (main arg)
-    (let ((server (make-dsm-server :port 6789)))
+    (let ((server (make-dsm-server "dsmp://:6789")))
       (add-mount-point! server "/plus" (lambda (x y) (+ x y)))
       (add-mount-point! server '/map map)
       (start-dsm-server server)))
@@ -117,7 +131,7 @@ dsmはオブジェクトを以下のように扱います．
   (use dsm.client)
 
   (define (main arg)
-    (let ((client (connect-server :host "localhost" :port 6789)))
+    (let ((client (connect-dsm-server "dsmp://localhost:6789")))
       (print ((client "/plus") 1 2))
       (let ((x 10))
         (print ((client "/map") (lambda (elem) (+ elem x))
@@ -136,12 +150,46 @@ dsmはオブジェクトを以下のように扱います．
   3
   (11 12)
 
-== 入手方法
+== URI
 
-((<URL:http://www.cozmixng.org/~kou/download/dsm.tar.gz>))
+(({make-dsm-server}))や(({connect-dsm-server}))ではサーバ／
+クライアントの位置をURIで指定します．dsmは以下のスキームを認
+識します．
 
-  % svn co http://www.cozmixng.org/repos/gauche/dsm/trunk dsm
+: dsmp
+   TCP/IP上でdsm独自プロトコルdsmpを用いて相手と通信します．
+   
+   指定例:
+     dsmp://localhost:59102
+   
+   この例では，localhost上の59102番ポートの相手とdsmpを用い
+   て通信します．
 
-== インストール
+: unix
+   UNIXドメインソケット上でdsm独自プロトコルdsmpを用いて相手
+   と通信します．
 
-  # gosh install/install.scm
+   指定例:
+     unix:///tmp/dsmp
+   
+   この例では，/tmp/dsmpソケットファイルを経由し，dsmpを用い
+   て通信します．
+
+: http
+   HTTPを用いて相手と通信します．ただし，まだ実験的な機能で
+   す．
+
+   指定例:
+     http://localhost:59102
+   
+   この例では，localhost上の59102番ポートで動いているプロセ
+   スとHTTPを用いて通信します．これは，(({make-dsm-server}))
+   手続きを用いてサーバを作成するときに使います．
+
+   指定例:
+     http://localhost/~dsmp/
+   
+   この例では，localhost上の80番ポートで動いているHTTPサーバ
+   のパス/~dsmp/で識別される相手とHTTPを用いて通信します．こ
+   れは，(({connect-dsm-server}))手続きを用いてサーバに接続
+   するときに使います．

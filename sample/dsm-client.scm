@@ -3,7 +3,7 @@
 (use dsm.client)
 
 (define (main arg)
-  (let ((client (connect-server :host "localhost" :port 6789)))
+  (let ((client (connect-dsm-server "dsmp://localhost:6789")))
     (print ((client "/plus-proc") 1 2))
     (print ((client "/plus-macro") 1 2))
     ((client "/for-each") display '("Hello" "World"))

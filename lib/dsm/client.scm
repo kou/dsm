@@ -4,33 +4,58 @@
   (use gauche.net)
   (use marshal)
   (use dsm.common)
-  (export connect-server)
+  (export connect-dsm-server path-of)
   )
 (select-module dsm.client)
 
 (define-class <dsm-client> ()
-  ((host :init-keyword :host :accessor host-of :init-value #f)
-   (port :init-keyword :port :accessor port-of :init-value 59102)
+  ((uri :init-keyword :uri :accessor uri-of)
    (socket :accessor socket-of)
+   (protocol :accessor protocol-of)
    ))
 
 (define-method initialize ((self <dsm-client>) args)
+  (define (invalid-type-message type)
+    #`",|type| not specified in uri ,(uri-of self)")
+  
   (next-method)
-  (slot-set! self 'socket
-             (make-client-socket 'inet
-                                 (host-of self)
-                                 (port-of self))))
+  (receive (scheme user-info host port path query fragment)
+      (parse-uri (uri-of self))
+    (set! (socket-of self)
+          (apply make-client-socket
+                 (case scheme
+                   ((dsmp http)
+                    (let ((invalid-type (cond ((not host) 'host)
+                                              ((not port) 'port)
+                                              (else #f))))
+                      (if invalid-type
+                        (error (invalid-type-message invalid-type))))
+                    (list 'inet host port))
+                   ((unix)
+                    (unless path
+                      (error (invalid-type-message 'path)))
+                    (list 'unix path))
+                   (else (error "unknown scheme: " scheme)))))
+    (set! (protocol-of self)
+          (case scheme
+            ((dsmp unix) (make <dsmp> :path path))
+            ((http) (make <dsmp-over-http> :path path))
+            (else (error "unknown scheme: " scheme))))))
 
-(define (connect-server . keywords)
-  (let* ((client (apply make <dsm-client> keywords))
+(define-method path-of ((self <dsm-client>))
+  (path-of (protocol-of self)))
+
+(define (connect-dsm-server uri . keywords)
+  (let* ((client (apply make <dsm-client> (append (list :uri uri) keywords)))
          (socket (socket-of client))
          (in (socket-input-port socket :buffering :modest))
          (out (socket-output-port socket :buffering :full))
          (table (make-marshal-table)))
     (lambda (mount-point)
-      (apply dsmp-request
-             (marshal table mount-point) table
-             in out
+      (apply dsm-request
+             (protocol-of client)
+             (marshal table mount-point)
+             table in out
 ;;             :post-handler (lambda (obj) obj)
              keywords))))
 

@@ -35,15 +35,15 @@
    (receive (host port)
      (args-fold (cdr args)
        options
-       (lambda (option name arg . seeds)         ; unrecognized
+       (lambda (option name arg . seeds) ; unrecognized
          (print "Unrecognized option:" name)
          (usage))
-       (lambda (operand host port) ; operand
+       (lambda (operand host port)      ; operand
          (values host port))
        default-host
        default-port
        )
-     (let ((server (make-dsm-server :host host :port port)))
+     (let ((server (make-dsm-server #`"dsmp://,|host|:,|port|")))
        (for-each (lambda (elem)
                    (add-mount-point! server (car elem) (cdr elem)))
                  marshalizable-key&value-alist)

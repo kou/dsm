@@ -6,7 +6,7 @@
 (let ((server #f))
   (define-test-case "dsm server test"
     (setup
-     (lambda () (set! server (make-dsm-server :port 11111))))
+     (lambda () (set! server (make-dsm-server "dsmp://:11111"))))
     (teardown
      (lambda () (stop-dsm-server server)))
     ("mount test"
