@@ -36,6 +36,10 @@ GPL or BSD License
 
   * リモートの手続き／マクロをローカルで適用する．
 
+== 依存ライブラリ
+
+  * ((<marshal|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=marshal>))
+
 == 入手方法
 
 ((<URL:http://www.cozmixng.org/~kou/download/dsm.tar.gz>))
