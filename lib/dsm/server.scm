@@ -118,10 +118,10 @@
 
     (define (accept-handler sock flag)
       (let* ((client (socket-accept (socket-of self)))
-             (output (socket-output-port client :buffering :none)))
+             (output (socket-output-port client :buffering :full)))
         ;; (p (socket-fd client))
         (selector-add! selector
-                       (socket-input-port client :buffering :none)
+                       (socket-input-port client :buffering :modest)
                        (lambda (input flag)
                          (thread-pool-push!
                           pool

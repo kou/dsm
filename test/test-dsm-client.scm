@@ -17,7 +17,7 @@
                   (run-process server-command
                                "--host" server-host
                                "--port" server-port)
-                (sys-nanosleep 500000000) ; wait for starting server
+                (sys-nanosleep 1000000000) ; wait for starting server
                 ))))
      (teardown
       (lambda ()

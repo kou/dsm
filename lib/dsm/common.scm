@@ -3,6 +3,7 @@
   (use text.tree)
   (use srfi-10)
   (use srfi-13)
+  (use gauche.time)
   (use gauche.net)
   (use gauche.selector)
   (use gauche.charconv)
@@ -133,46 +134,51 @@
   (display body output)
   (flush output))
 
-(define (read-dsmp input . keywords)
+(define (dsmp-read input . keywords)
   (let-keywords* keywords ((eof-handler (lambda () "Got eof")))
     (debug (list "reading..." input))
-    (let* ((header (read-dsmp-header input eof-handler))
-           (body (read-dsmp-body header input eof-handler)))
+    (let* ((header (dsmp-read-header input eof-handler))
+           (body (dsmp-read-body header input eof-handler)))
       (debug (list "read" (dsmp-header->string header) body))
       (values header body))))
-  
-(define (read-dsmp-header input eof-handler)
+
+(define (read-with-timeout input reader timeout not-response-handler)
+  (if (char-ready? input)
+    (reader input)
+    (let ((result #f)
+          (selector (make <selector>)))
+      (selector-add! selector
+                     input
+                     (lambda (in . args)
+                       (selector-delete! selector input #f #f)
+                       (set! result (reader in)))
+                     '(r))
+         (if (zero? (selector-select selector timeout))
+           (not-response-handler)
+           result))))
+
+(define (dsmp-read-header input eof-handler)
   (debug (list "reading header..."))
-  (let ((header (read-line input)))
+  (let ((header (read-with-timeout input read-line (list 3 0)
+                                   (lambda () (error "not response")))))
     (debug header)
     (if (eof-object? header)
         (eof-handler)
         (parse-dsmp-header header))))
 
-(define (read-dsmp-body header input eof-handler)
+(define (dsmp-read-body header input eof-handler)
   (read-from-string (ces-convert
                      (read-required-block input (size-of header) eof-handler)
                      (encoding-of header))))
 
 (define (read-required-block input size eof-handler)
   (define (more-read size)
-    (call/cc
-     (lambda (return)
-       (let ((reader (make-reader size return))
-             (selector (make <selector>)))
-         (if (char-ready? input)
-           (reader input)
-           (begin
-             (selector-add! selector
-                            input
-                            reader
-                            '(r))
-             (if (zero? (selector-select selector (list 3 0)))
-               (error "not response"))))))))
+    (read-with-timeout input (make-reader size) (list 3 0)
+                       (lambda () (error "not response"))))
   
-  (define (make-reader size return)
+  (define (make-reader size)
     (lambda (in . args)
-      (return (read-block size in))))
+      (read-block size in)))
 
   (define (read-more-if-need block)
     (debug (list "read body" block))
@@ -224,7 +230,7 @@
                   marshaled-obj
                   out)
       (receive (header body)
-          (read-dsmp in :eof-handler eof-handler)
+          (dsmp-read in :eof-handler eof-handler)
         (handle-response header body)))
 
     (define (handle-response header body)
@@ -304,7 +310,7 @@
   (let-keywords* keywords ((eof-handler (lambda ()
                                           (print "Got eof from client"))))
     (receive (header body)
-        (read-dsmp input :eof-handler eof-handler)
+        (dsmp-read input :eof-handler eof-handler)
       (let ((marshalized-body (marshal
                                table
                                (apply handle-dsmp-body

@@ -24,8 +24,8 @@
 (define (connect-server . keywords)
   (let* ((client (apply make <dsm-client> keywords))
          (socket (socket-of client))
-         (in (socket-input-port socket :buffering :none))
-         (out (socket-output-port socket :buffering :none))
+         (in (socket-input-port socket :buffering :modest))
+         (out (socket-output-port socket :buffering :full))
          (table (make-marshal-table)))
     (lambda (mount-point)
       (apply dsmp-request
