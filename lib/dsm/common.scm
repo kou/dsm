@@ -174,18 +174,21 @@
     (lambda (in . args)
       (return (read-block size in))))
 
-  (debug (list "reading body..."))
-  (let ((block (more-read size)))
+  (define (read-more-if-need block)
     (debug (list "read body" block))
     (cond ((eof-object? block) (eof-handler))
           ((< (string-size block) size)
            (debug (list "more reading..." size (string-size block)
                         (- size (string-size block))))
-           (string-append block
-                          (more-read (- size (string-size block)))))
+           (read-more-if-need
+            (string-append block
+                           (more-read (- size (string-size block))))))
           (else
            (debug (list "got block" block))
-           block))))
+           block)))
+    
+  (debug (list "reading body..."))
+  (read-more-if-need (more-read size)))
 
 (define (need-remote-eval? obj table)
   (and (reference-object? obj)
