@@ -6,6 +6,8 @@
   (let ((client (connect-server :host "localhost" :port 6789)))
     (print ((client "/plus-proc") 1 2))
     (print ((client "/plus-macro") 1 2))
+    ((client "/for-each") display '("Hello" "World"))
+    (newline)
     (let ((x 10))
       (print ((client "/map") (lambda (elem) (+ elem x))
                               '(1 2))))))
