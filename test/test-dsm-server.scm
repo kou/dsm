@@ -8,7 +8,7 @@
     (setup
      (lambda () (set! server (make-dsm-server "dsmp://:11111"))))
     (teardown
-     (lambda () (stop-dsm-server server)))
+     (lambda () (dsm-server-stop! server)))
     ("mount test"
      (assert-each assert-equal
                   `(("integer" . 1)
@@ -34,6 +34,4 @@
                                (let ((id (id-get (marshal-table-of server)
                                                  obj)))
                                  (list obj
-                                     (get-by-id server id))))))
-     )
-    ))
+                                     (get-by-id server id)))))))))

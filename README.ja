@@ -122,7 +122,9 @@ dsmはオブジェクトを以下のように扱います．
     (let ((server (make-dsm-server "dsmp://:6789")))
       (add-mount-point! server "/plus" (lambda (x y) (+ x y)))
       (add-mount-point! server '/map map)
-      (start-dsm-server server)))
+      (dsm-server-start! server)
+      (dsm-server-join! server)
+      (dsm-server-stop! server)))
 
 クライアント:
 

@@ -15,6 +15,6 @@
     (add-mount-point! server '/long-string
                       (call-with-input-file "lib/dsm/server.scm"
                         port->string))
-    (start-dsm-server server)
+    (dsm-server-start! server)
     (dsm-server-join! server)
-    (stop-dsm-server server)))
+    (dsm-server-stop! server)))

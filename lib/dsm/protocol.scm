@@ -115,7 +115,7 @@
       (read-from-string (ces-convert
                          (dsm-read-body protocol header input eof-handler)
                          (encoding-of header))))
-      
+
     (debug (list "reading..." input))
     (let* ((header (read-header))
            (body (read-body header)))

@@ -71,7 +71,6 @@
            (debug (list "got block" block))
            block)))
     
-  (debug (list "reading body..."))
   (read-more-if-need (more-read size)))
 
 (provide "dsm/protocol/base")

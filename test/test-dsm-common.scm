@@ -80,7 +80,7 @@
                                               (unmarshal table body)))
                               (get-output-string out))))))
      )
-    ("pares-uri test"
+    ("parse-uri test"
      (assert-each (lambda (excepted uri)
                     (receive all (parse-uri uri)
                       (assert-equal excepted all)))

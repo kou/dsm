@@ -23,7 +23,7 @@
        (server-host "localhost")
        (server-port 59104)
        (process (test-dsm-server-run server-command server-host server-port)))
-  (define-test-case "Server test"
+  (define-test-case "dsm client/server connection test"
 ;;      (setup
 ;;       (lambda ()
 ;;         (set! process
