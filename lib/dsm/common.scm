@@ -6,7 +6,7 @@
   (use gauche.charconv)
   (use marshal)
   (export dsmp-request dsmp-response
-          version-of encoding-of length-of)
+          version-of encoding-of size-of)
   )
 (select-module dsm.common)
 
@@ -16,7 +16,7 @@
 (define-class <dsmp-header> ()
   ((version :init-keyword :version :accessor version-of)
    (encoding :init-keyword :encoding :accessor encoding-of)
-   (length :init-keyword :length :accessor length-of)
+   (size :init-keyword :size :accessor size-of)
    (command :init-keyword :command :accessor command-of)))
 
 (define (make-dsmp-header alist)
@@ -27,8 +27,8 @@
            (slot-set! header 'encoding value))
           ((rxmatch #/^c/ key)
            (slot-set! header 'command value))
-          ((rxmatch #/^l/ key)
-           (slot-set! header 'length (x->number value)))))
+          ((rxmatch #/^s/ key)
+           (slot-set! header 'size (x->number value)))))
 
   (let ((dsmp-header (make <dsmp-header>)))
     (for-each (lambda (elem)
@@ -43,13 +43,13 @@
 (define (make-dsmp-header-from-string str . keywords)
   (make-dsmp-header`(("v" . ,dsmp-version)
                      ("e" . ,(ces-guess-from-string str "*JP"))
-                     ("l" . ,(string-length str))
+                     ("s" . ,(string-size str))
                      ("c" . ,(get-keyword :command keywords)))))
 
 (define (dsmp-header->string header)
   (string-join (list #`"v=,(version-of header)"
                      #`"e=,(encoding-of header)"
-                     #`"l=,(length-of header)"
+                     #`"s=,(size-of header)"
                      #`"c=,(command-of header)")
                dsmp-delimiter))
 
@@ -65,7 +65,7 @@
                                       dsmp-delimiter))))
 
 (define (dsmp-write header body output)
-;  (p (list "write" header body))
+;;  (p (list "write" header body))
   (display header output)
   (display "\n" output)
   (display body output)
@@ -75,21 +75,26 @@
   (let-keywords* keywords ((eof-handler (lambda () "Got eof")))
     ;; (p (list "reading..."))
     (let* ((header (read-dsmp-header input eof-handler))
-           (body (read-dsmp-body (length-of header) input eof-handler)))
+           (body (read-dsmp-body header input eof-handler)))
       ;; (p (list "read" (dsmp-header->string header) body))
       (values header body))))
   
 (define (read-dsmp-header input eof-handler)
   (let ((header (read-line input)))
+;;    (p header)
     (if (eof-object? header)
         (eof-handler)
         (parse-dsmp-header header))))
 
-(define (read-dsmp-body length input eof-handler)
-  (let ((body (read-block length input)))
+(define (read-dsmp-body header input eof-handler)
+;;  (p header)
+  (let ((body (read-block (size-of header) input)))
+;;    (p body)
     (if (eof-object? body)
         (eof-handler)
-        (read-from-string body))))
+        (read-from-string (ces-convert body
+                                       (encoding-of header)
+                                       (gauche-character-encoding))))))
 
 (define (need-remote-eval? obj table)
   (and (reference-object? obj)
