@@ -67,8 +67,8 @@
     
     (define (response-handler obj)
       (cond ((need-remote-eval? obj table)
-             (lambda arg
-               (eval-in-remote protocol obj arg table in out
+             (lambda args
+               (eval-in-remote protocol obj args table in out
                                :get-handler get-handler
                                :post-handler post-handler
                                :eof-handler eof-handler)))
@@ -181,20 +181,26 @@
            (with-error-handler
             (lambda (e) (make-dsm-error (slot-ref e 'message)))
             (lambda ()
+              (define (wrap-for-need-remote-eval obj)
+                (cond ((need-remote-eval? obj table)
+                       (lambda args
+                         (apply eval-in-remote
+                                protocol obj args table
+                                in out
+                                :post-handler post-handler
+                                (if eof-handler
+                                  (list :eof-handler eof-handler)
+                                  '()))))
+                      ;; XXX: If you're confusing, comment out this closure.
+                      ((and (is-a? obj <collection>)
+                            (not (string? obj)))
+                       (map-to (class-of obj) wrap-for-need-remote-eval obj))
+                      (else obj)))
+              
               (eval-in-anonymous-module
                (unmarshal table (car body))
-               (map (lambda (elem)
-                      (let ((obj (unmarshal table elem)))
-                        (if (need-remote-eval? obj table)
-                            (lambda arg
-                              (apply eval-in-remote
-                                     protocol obj arg table
-                                     in out
-                                     :post-handler post-handler
-                                     (if eof-handler
-                                       (list :eof-handler eof-handler)
-                                       '())))
-                            obj)))
+               (map (lambda (arg)
+                      (wrap-for-need-remote-eval (unmarshal table arg)))
                     (cdr body))))))
           ((string=? "response" command) (response-handler body))
           ((string=? "get" command) (get-handler body))

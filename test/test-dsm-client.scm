@@ -49,6 +49,14 @@
                                     (apply (server key) args)))
                     procedure-list
                     :apply-if-can #t)))
+    ("error procedure test"
+     (let ((server (connect-dsmp-server server-host server-port)))
+       (assert-each (lambda (key proc expected . args)
+                      (assert-error-message expected
+                                            (lambda ()
+                                              (apply (server key) args))))
+                    error-procedure-list
+                    :apply-if-can #t)))
     ("marshal procedure in collection test"
      (let ((server (connect-dsmp-server server-host server-port)))
        (assert-each (lambda (key proc expect . args)
@@ -58,6 +66,14 @@
                                          (server key)
                                          args)))
                     procedure-in-collection-list
+                    :apply-if-can #t)
+       (assert-each (lambda (key proc expect . args)
+                      (assert-equal expect
+                                    (map (lambda (server-col arg)
+                                           (apply (cadr server-col) arg))
+                                         (server key)
+                                         args)))
+                    procedure-in-collection2-list
                     :apply-if-can #t)))
     ("marshallable object test"
      (let ((server (connect-dsmp-server server-host server-port)))

@@ -39,6 +39,9 @@ GPL or BSD License
 以下のような機能を実装したいです．
 
   * 参照オブジェクトの受渡し．
+  * リモート手続きの呼び出しがピンポンしたときにエラーが発生
+    してもきちんとエラーを転送する（test/dsm-server-conf.scm
+    のerror-procedure-listの"error-proc2"にパスする）．
 
 == 依存ライブラリ
 
