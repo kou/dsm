@@ -4,7 +4,7 @@
   (use gauche.net)
   (use marshal)
   (use dsm.common)
-  (export connect-dsm-server path-of)
+  (export dsm-connect-server path-of)
   )
 (select-module dsm.client)
 
@@ -45,8 +45,8 @@
 (define-method path-of ((self <dsm-client>))
   (path-of (protocol-of self)))
 
-(define (connect-dsm-server uri . keywords)
-  (let* ((client (apply make <dsm-client> (append (list :uri uri) keywords)))
+(define (dsm-connect-server uri . keywords)
+  (let* ((client (apply make <dsm-client> :uri uri keywords))
          (socket (socket-of client))
          (in (socket-input-port socket :buffering :modest))
          (out (socket-output-port socket :buffering :full))

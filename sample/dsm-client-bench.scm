@@ -5,7 +5,7 @@
 (use dsm.client)
 
 (define (main arg)
-  (let ((client (connect-dsm-server "dsmp://localhost:6789")))
+  (let ((client (dsm-connect-server "dsmp://localhost:6789")))
     (bm (lambda (r)
           (report r (lambda () (client "/one"))
                   :label "/one")

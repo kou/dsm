@@ -148,7 +148,8 @@
 (define (handle-dsm-body protocol command body table in out . keywords)
   (let-keywords* keywords ((response-handler (lambda (x) x))
                            (get-handler (lambda (x) x))
-                           (post-handler (lambda (x) x)))
+                           (post-handler (lambda (x) x))
+                           (eof-handler #f))
     (cond ((string=? "eval" command)
            (with-error-handler
             (lambda (e) (make-dsm-error (slot-ref e 'message)))
@@ -159,9 +160,13 @@
                       (let ((obj (unmarshal table elem)))
                         (if (need-remote-eval? obj table)
                             (lambda arg
-                              (eval-in-remote protocol obj arg table
-                                              in out
-                                              :post-handler post-handler))
+                              (apply eval-in-remote
+                                     protocol obj arg table
+                                     in out
+                                     :post-handler post-handler
+                                     (if eof-handler
+                                       (list :eof-handler eof-handler)
+                                       '())))
                             obj)))
                     (cdr body))))))
           ((string=? "response" command) (response-handler body))

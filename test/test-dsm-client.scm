@@ -7,7 +7,7 @@
 (load "test/dsm-server-conf")
 
 (define (connect-dsmp-server host port)
-  (connect-dsm-server (uri-compose :scheme "dsmp"
+  (dsm-connect-server (uri-compose :scheme "dsmp"
                                    :host host
                                    :port port)))
 
@@ -22,15 +22,15 @@
 (let* ((server-command "./test/dsm-server.scm")
        (server-host "localhost")
        (server-port 59104)
-       (process (test-dsm-server-run server-command server-host server-port)))
+       (process '(test-dsm-server-run server-command server-host server-port)))
   (define-test-case "dsm client/server connection test"
-;;      (setup
-;;       (lambda ()
-;;         (set! process
-;;               (test-dsm-server-run server-command server-host server-port))))
-;;      (teardown
-;;       (lambda ()
-;;         (process-kill process)))
+     (setup
+      (lambda ()
+        (set! process
+              (test-dsm-server-run server-command server-host server-port))))
+     (teardown
+      (lambda ()
+        (process-kill process)))
     ("marshalizable object test"
      (let ((server (connect-dsmp-server server-host server-port)))
        (for-each (lambda (key&value)
