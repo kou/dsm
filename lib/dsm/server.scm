@@ -81,7 +81,7 @@
 (define-method get-by-id ((self <dsm-server>) id)
   (id-ref (marshal-table-of self) id))
 
-(define dsm-thread-disable (eq? 'none (gauche-thread-type)))
+(define dsm-thread-disable #t);(eq? 'none (gauche-thread-type)))
 
 (define-class <thread-pool> ()
   ((pool :accessor pool-of :init-form '())
@@ -397,9 +397,9 @@
             ;; (p "SELECTOR")
             (selector-add! selector
                            input
-                           (lambda (input flag)
-                             (selector-delete! selector input #f #f)
-                             (handle-dsm-protocol client input output))
+                           (lambda (in flag)
+                             (selector-delete! selector in #f #f)
+                             (handle-dsm-protocol client in output))
                            '(r)))))))
 
     (define (make-eof-handler return)

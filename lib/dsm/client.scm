@@ -54,7 +54,7 @@
     (lambda args
       (let-optionals* args ((mount-point #f))
         (if mount-point
-          (if (eq? 'CONNECTED (socket-status (socket-of client)))
+          (if (eq? 'CONNECTED (socket-status socket))
             (apply dsm-request
                    (protocol-of client)
                    (marshal table mount-point)
@@ -62,6 +62,6 @@
                    ;; :post-handler (lambda (obj) obj)
                    keywords)
             (error "doesn't connected."))
-          (socket-shutdown (socket-of client) 2))))))
+          (socket-shutdown socket 2))))))
 
 (provide "dsm/client")

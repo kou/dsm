@@ -24,32 +24,42 @@
       (sys-nanosleep 1000)) ; wait for starting server
     server))
 
+(define (test-dsm-server-stop server)
+  (process-kill server)
+  (do ()
+      ((not (process-alive? server)))
+    (process-wait server #t)))
+
 (let* ((server-command "./test/dsm-server.scm")
        (server-host "localhost")
        (server-port 59104)
        (process '(test-dsm-server-run server-command server-host server-port)))
   (define-test-case "dsm client/server connection test"
-     (setup
-      (lambda ()
-        (set! process
-              (test-dsm-server-run server-command server-host server-port))))
-     (teardown
-      (lambda ()
-        (process-kill process)))
-    ("marshalizable object test"
-     (let ((server (connect-dsmp-server server-host server-port)))
-       (for-each (lambda (key&value)
-                   (assert-equal (cdr key&value) (server (car key&value))))
-                 marshalizable-key&value-alist)))
+    (setup
+     (lambda ()
+       (set! process
+             (test-dsm-server-run server-command server-host server-port))))
+    (teardown
+     (lambda ()
+       (test-dsm-server-stop process)))
     ("marshal procedure test"
      (let ((server (connect-dsmp-server server-host server-port)))
-       (for-each (lambda (elem)
-                   (assert-equal (caddr elem)
-                                 (apply (server (car elem)) (cdddr elem))))
-                 procedure-list)))
+       (assert-each (lambda (key proc expect . args)
+                      (assert-equal expect
+                                    (apply (server key) args)))
+                    procedure-list
+                    :apply-if-can #t)))
+    ("marshalizable object test"
+     (let ((server (connect-dsmp-server server-host server-port)))
+       (assert-each (lambda (key value)
+                      (assert-equal value (server key)))
+                    marshalizable-key&value-list
+                    :apply-if-can #t)))
     ("multiple client test"
-     (for-each (lambda (elem)
-                 (let ((server (connect-dsmp-server server-host server-port)))
-                   (assert-equal (caddr elem)
-                                 (apply (server (car elem)) (cdddr elem)))))
-               procedure-list))))
+     (assert-each (lambda (key proc expect . args)
+                    (let ((server (connect-dsmp-server server-host
+                                                       server-port)))
+                      (assert-equal expect
+                                    (apply (server key) args))))
+                  procedure-list
+                  :apply-if-can #t))))

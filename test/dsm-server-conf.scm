@@ -1,11 +1,10 @@
-(define marshalizable-key&value-alist
+(define marshalizable-key&value-list
   ; (mount-point . value)
-  '(("integer" . 1)
-    ("string" . "str")
-    ("symbol" . sym)
-    ("list" . (1 "str" sym))
-    ("vector" . #(1 "str" sym))
-    ))
+  '(("integer" 1)
+    ("string" "str")
+    ("symbol" sym)
+    ("list" (1 "str" sym))
+    ("vector" #(1 "str" sym))))
 
 (define procedure-list
   ; (mount-point proc expected arg ...)
@@ -20,5 +19,4 @@
                   ,(lambda (proc x)
                      (proc (+ 1 x)))
                   2)
-    ("procedure5" ,map (10 20) ,(lambda (x) (* 10 x)) (1 2))
-    ))
+    ("procedure5" ,map (10 20) ,(lambda (x) (* 10 x)) (1 2))))

@@ -3,6 +3,7 @@
 (use test.unit)
 
 (define-module test-dsm-common
+  (use srfi-13)
   (use rfc.uri)
   (use test.unit)
   (use marshal)
@@ -39,18 +40,19 @@
     (setup
      (lambda () (set! table (make-marshal-table))))
     ("make-header test"
-     (assert-each assert-equal
-                  `(("v=1;e=UTF-8;s=1;c=get" . 1)
-                    ("v=1;e=UTF-8;s=5;c=get" . "abc")
-                    ("v=1;e=UTF-8;s=2;c=get" . ())
-                    ("v=1;e=UTF-8;s=5;c=get" . (1 2))
-                    )
-                  :prepare (lambda (item)
-                             (list (car item)
-                                   (x->dsm-header->string dsmp
-                                                          table
-                                                          (cdr item)
-                                                          :command "get")))))
+     (let ((encoding (string-upcase
+                      (symbol->string (gauche-character-encoding)))))
+       (assert-each assert-equal
+                    `((,#`"v=1;e=,|encoding|;s=1;c=get" . 1)
+                      (,#`"v=1;e=,|encoding|;s=5;c=get" . "abc")
+                      (,#`"v=1;e=,|encoding|;s=2;c=get" . ())
+                      (,#`"v=1;e=,|encoding|;s=5;c=get" . (1 2)))
+                    :prepare (lambda (item)
+                               (list (car item)
+                                     (x->dsm-header->string dsmp
+                                                            table
+                                                            (cdr item)
+                                                            :command "get"))))))
     ("parse-header test"
      (assert-each assert-dsm-header
                   `((,dsmp "v=1;e=UTF-8;s=1;c=get\n" 1 "UTF-8" 1 "get")
