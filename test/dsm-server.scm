@@ -46,7 +46,7 @@
      (let ((server (make-dsm-server #`"dsmp://,|host|:,|port|")))
        (for-each (lambda (elem)
                    (apply add-mount-point! server elem))
-                 marshalizable-key&value-list)
+                 marshallable-key&value-list)
        (for-each (lambda (elem)
                    (add-mount-point! server (car elem) (cadr elem)))
                  procedure-list)

@@ -17,15 +17,11 @@
 (define doh-version 1)
 (define doh-delimiter "\r\n")
 
-(define get-meta
-  (with-module www.cgi get-meta))
-;;(define get-meta cgi-get-metavariable)
-
 (define-class <dsmp-over-http> (<dsm-protocol>)
   ((version :accessor version-of :init-value doh-version)))
 
 (define-method dsm-header->string ((self <dsmp-over-http>) header)
-  (string-join (list #`"HTTP/1.1 GET ,(or (path-of self) \"/\")"
+  (string-join (list #`"HTTP/1.1 POST ,(or (path-of self) \"/\")"
                      #`"X-DOH-Version: ,(version-of self)"
                      #`"Content-Type: text/x-s-expression; charest=,(encoding-of header)"
                      #`"Content-Length: ,(size-of header)"
@@ -57,8 +53,8 @@
                        result)
                  (next-line))))))
 
-(define-method dsm-read-body
-    ((self <dsmp-over-http>) header input eof-handler not-response-handler timout)
+(define-method dsm-read-body ((self <dsmp-over-http>) header input
+                              eof-handler not-response-handler timout)
   (read-required-block input (size-of header)
                        eof-handler not-response-handler timeout))
 
@@ -70,19 +66,20 @@
   (display body output))
 
 (define-method parse-header ((self <dsmp-over-http>) alist)
-  (make-dsm-header (make <dsmp-over-http>)
-                   (parameterize ((cgi-metavariables alist))
-                     `(("version" . ,(get-meta "X_DOH_VERSION"))
-                       ("encoding" . ,(let ((type (get-meta "CONTENT_TYPE")))
-                                        (if type
-                                          (car (assoc-ref (map (lambda (field)
-                                                                 (string-split field #/=\s*/))
-                                                               (string-split type #/\;\s*/))
-                                                          "charset"
-                                                          '(#f)))
-                                          (gauche-character-encoding))))
-                       ("size" . ,(get-meta "CONTENT_LENGTH"))
-                       ("command" . ,(get-meta "X_DOH_COMMAND"))))))
+  (make-dsm-header
+   (make <dsmp-over-http>)
+   (parameterize ((cgi-metavariables alist))
+     `(("version" . ,(cgi-get-metavariable "X_DOH_VERSION"))
+       ("encoding" . ,(let ((type (cgi-get-metavariable "CONTENT_TYPE")))
+                        (if type
+                          (car (assoc-ref (map (lambda (field)
+                                                 (string-split field #/=\s*/))
+                                               (string-split type #/\;\s*/))
+                                          "charset"
+                                          '(#f)))
+                          (gauche-character-encoding))))
+       ("size" . ,(cgi-get-metavariable "CONTENT_LENGTH"))
+       ("command" . ,(cgi-get-metavariable "X_DOH_COMMAND"))))))
 
 (define-method accept-version? ((self <dsmp-over-http>) version)
   (>= doh-version version))

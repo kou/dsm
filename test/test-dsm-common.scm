@@ -6,7 +6,7 @@
   (use srfi-13)
   (use rfc.uri)
   (use test.unit)
-  (use marshal)
+  (use msm.marshal)
   (use dsm.common))
 
 (select-module test-dsm-common)

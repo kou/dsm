@@ -49,11 +49,11 @@
                                     (apply (server key) args)))
                     procedure-list
                     :apply-if-can #t)))
-    ("marshalizable object test"
+    ("marshallable object test"
      (let ((server (connect-dsmp-server server-host server-port)))
        (assert-each (lambda (key value)
                       (assert-equal value (server key)))
-                    marshalizable-key&value-list
+                    marshallable-key&value-list
                     :apply-if-can #t)))
     ("multiple client test"
      (assert-each (lambda (key proc expect . args)

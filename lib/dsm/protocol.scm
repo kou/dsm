@@ -2,14 +2,14 @@
   (extend dsm.protocol.dsmp
           dsm.protocol.http)
   (use gauche.charconv)
-  (use marshal)
+  (use msm.marshal)
   (use dsm.utils)
   (use dsm.error)
   (use dsm.protocol.header)
   (export dsm-request dsm-response))
 (select-module dsm.protocol)
 
-(define (dsm-request protocol marshaled-obj table in out . keywords)
+(define (dsm-request protocol marshalled-obj table in out . keywords)
   (define (show-error message stack-trace)
     (display (format "~a\n" message)
              (current-error-port))
@@ -37,7 +37,7 @@
                               (error "not response from server")))
                            (timeout (list 15 0)))
     (define (dsm-handler)
-      (dsm-write protocol command marshaled-obj out)
+      (dsm-write protocol command marshalled-obj out)
       (receive (header body)
           (dsm-read protocol in
                     :eof-handler eof-handler
@@ -54,8 +54,8 @@
                                   :response-handler response-handler
                                   :post-handler post-handler)))
         (cond ((string=? "eval" (command-of header))
-               (let ((marshaled-obj (marshal table obj)))
-                 (dsm-request protocol marshaled-obj table
+               (let ((marshalled-obj (marshal table obj)))
+                 (dsm-request protocol marshalled-obj table
                               in out
                               :command "response"
                               :get-handler get-handler
@@ -87,15 +87,15 @@
                   :eof-handler eof-handler
                   :not-response-handler not-response-handler
                   :timeout timeout)
-      (let ((marshalized-body (marshal
-                               table
-                               (apply handle-dsm-body
-                                      protocol
-                                      (command-of header)
-                                      body table
-                                      input output
-                                      keywords))))
-        (dsm-write protocol "response" marshalized-body output)))))
+      (let ((marshalled-body (marshal
+                              table
+                              (apply handle-dsm-body
+                                     protocol
+                                     (command-of header)
+                                     body table
+                                     input output
+                                     keywords))))
+        (dsm-write protocol "response" marshalled-body output)))))
 
 (define (x->dsm-header protocol table obj . keywords)
   (apply make-dsm-header-from-string protocol (marshal table obj) keywords))

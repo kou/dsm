@@ -8,7 +8,7 @@
   (use gauche.threads)
   (use gauche.selector)
   (use gauche.parameter)
-  (use marshal)
+  (use msm.marshal)
   (use dsm.common)
   (export make-dsm-server
           port-of path-of uri-of

@@ -41,15 +41,15 @@
         (if (zero? (begin
                      (call/cc
                       (lambda (cont)
-                        (set! retry cont)))
-                     ;; (selector-select selector timeout)))
-                     (selector-select selector #f)))
+                        (set! retry
+                              (lambda () (cont 'retry)))))
+                     (selector-select selector timeout)))
           (timeout-handler retry)
           result)))))
 
 (define (read-required-block input size eof-handler not-response-handler timeout)
   (define (more-read size)
-    (define retry-count 10)
+    (define retry-count 3)
     (read-with-timeout input (make-reader size) timeout
                        (lambda (retry)
                          (dec! retry-count)

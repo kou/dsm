@@ -1,4 +1,4 @@
-(define marshalizable-key&value-list
+(define marshallable-key&value-list
   ; (mount-point . value)
   '(("integer" 1)
     ("string" "str")

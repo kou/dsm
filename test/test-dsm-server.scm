@@ -26,7 +26,7 @@
                                      (get-by-mount-point server key)))))
      )
     ("get-by-id test"
-     (let ((id-get (with-module marshal id-get))
+     (let ((id-get (with-module msm.marshal id-get))
            (marshal-table-of (with-module dsm.server marshal-table-of)))
        (assert-each assert-equal
                     `(1 "str" sym () #() ,(lambda () #f))

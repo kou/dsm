@@ -2,7 +2,7 @@
   (extend dsm.dsm)
   (use srfi-13)
   (use gauche.net)
-  (use marshal)
+  (use msm.marshal)
   (use dsm.common)
   (export dsm-connect-server path-of uri-of))
 (select-module dsm.client)

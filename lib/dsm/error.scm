@@ -1,7 +1,7 @@
 (define-module dsm.error
   (extend dsm.dsm)
   (use gauche.vm.debugger)
-  (use marshal)
+  (use msm.marshal)
   (export make-dsm-error dsm-error?
           message-of stack-trace-of))
 (select-module dsm.error)
@@ -48,7 +48,7 @@
   (lambda args
     (apply make <dsm-error> args)))
 
-(define-method marshalizable? ((self <dsm-error>))
+(define-method marshallable? ((self <dsm-error>))
   #t)
 
 (define (dsm-error? obj)

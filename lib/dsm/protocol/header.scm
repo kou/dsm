@@ -1,7 +1,7 @@
 (define-module dsm.protocol.header
   (extend dsm.protocol.base)
   (use gauche.charconv)
-  (use marshal)
+  (use msm.marshal)
   (export version-of encoding-of size-of command-of
           make-dsm-header make-dsm-header-from-string))
 (select-module dsm.protocol.header)
