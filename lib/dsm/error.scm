@@ -39,10 +39,11 @@
        st))
 
 (define-method write-object ((self <dsm-error>) out)
-  (format out "#,(<dsm-error> :message ~s :stack-trace-source ~a)"
+  (format out "#,(<dsm-error> :message ~s :stack-trace-source ~s)"
           (message-of self)
-          (marshal (make-marshal-table)
-                   (make-stack-trace-source (stack-trace-of self)))))
+          (x->marshalized-object
+           (make-stack-trace-source (stack-trace-of self))
+           (make-marshal-table))))
 
 (define-reader-ctor '<dsm-error>
   (lambda args
