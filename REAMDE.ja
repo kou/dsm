@@ -1,0 +1,31 @@
+# -*- rd -*-
+
+= README.ja
+
+$Id$
+
+== 作者
+
+Kouhei Sutou <kou@cozmixng.org>
+
+== ライセンス
+
+GPL or BSD License
+
+== メーリングリスト
+
+((<COZMIXNG RWiki - 連絡先|URL:http://www.cozmixng.org/~rwiki/index.rb?cmd=view;name=%CF%A2%CD%ED%C0%E8>))を御覧下さい．
+
+== なにこれ？
+
+簡易分散Schemeライブラリです．
+
+== 入手方法
+
+((<URL:http://www.cozmixng.org/~kou/download/dsm.tar.gz>))
+
+  % svn co http://www.cozmixng.org/repos/gauche/dsm/trunk dsm
+
+== インストール
+
+  # gosh install/install.scm

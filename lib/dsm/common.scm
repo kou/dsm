@@ -1,4 +1,5 @@
 (define-module dsm.common
+  (extend dsm.dsm)
   (use text.tree)
   (use srfi-13)
   (use gauche.net)
@@ -11,12 +12,6 @@
 
 (define dsmp-version 1)
 (define dsmp-delimiter ";")
-
-; (define-class <remote-object> ()
-;   ((eval-proc :init-keyword :eval-proc :accessor eval-proc)
-;    (id :accessor id-of)))
-
-; (define-method 
 
 (define-class <dsmp-header> ()
   ((version :init-keyword :version :accessor version-of)

@@ -1,4 +1,5 @@
 (define-module dsm.client
+  (extend dsm.dsm)
   (use srfi-13)
   (use gauche.net)
   (use marshal)
