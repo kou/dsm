@@ -40,10 +40,10 @@
 
 (define (make-dsm-header-from-string protocol str . keywords)
   (make-dsm-header protocol
-                   `(("e" . ,(or (ces-guess-from-string str "*JP")
-                                 (gauche-character-encoding)
-                                 ;;"UTF-8"
-                                 ))
+                   `(("e" . ,(or (and (string-scan str "\\0")
+                                      "none")
+                                 (ces-guess-from-string str "*JP")
+                                 "none"))
                      ("s" . ,(string-size str))
                      ("c" . ,(get-keyword :command keywords)))))
 

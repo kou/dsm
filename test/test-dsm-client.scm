@@ -88,4 +88,12 @@
                       (assert-equal expect
                                     (apply (server key) args))))
                   procedure-list
+                  :apply-if-can #t))
+    ("binary data test"
+     (assert-each (lambda (key proc expect . args)
+                    (let ((server (connect-dsmp-server server-host
+                                                       server-port)))
+                      (assert-equal expect
+                                    (apply (server key) args))))
+                  binary-data-list
                   :apply-if-can #t))))

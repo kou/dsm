@@ -45,3 +45,9 @@
                    (,+ ,*)
                    (((1) (2) (3))
                     ((4) (5) (6))))))
+
+(define binary-data-list
+  ;; (mount-point proc expected arg ...)
+  (let ((data1 #*"\x00\x01\x02\x03"))
+    `(("binary-data1" ,(lambda () data1) ,data1))))
+       
