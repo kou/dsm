@@ -11,11 +11,10 @@
   (use marshal)
   (use dsm.common)
   (export make-dsm-server
-          port-of path-of
+          port-of path-of uri-of
           dsm-server-start! dsm-server-stop! dsm-server-join!
           add-mount-point! get-by-mount-point get-by-id
-          require-in-root-thread required-in-root-thread?)
-  )
+          require-in-root-thread required-in-root-thread?))
 (select-module dsm.server)
 
 (define-class <dsm-server> ()
@@ -30,8 +29,7 @@
    (marshal-table :accessor marshal-table-of
                   :init-form (make-marshal-table))
    (timeout :init-keyword :timeout :accessor timeout-of
-            :init-value '(1 0))
-   ))
+            :init-value '(0 500000))))
 
 (define-method initialize ((self <dsm-server>) args)
   (next-method)
@@ -393,7 +391,11 @@
                           input output
                           :get-handler (cut get-by-mount-point self <>)
                           :eof-handler (cut (make-eof-handler cont)
-                                            client input output))
+                                            client input output)
+                          :not-response-handler
+                          (lambda ()
+                            (print "not resposne from client")
+                            (cont 0)))
             ;; (p "SELECTOR")
             (selector-add! selector
                            input

@@ -10,9 +10,11 @@
 
 (define-method dsm-header->string ((self <dsm-protocol>) header)
   (error "not implemented!"))
-(define-method dsm-read-header ((self <dsm-protocol>) input eof-handler)
+(define-method dsm-read-header
+    ((self <dsm-protocol>) input eof-handler not-response-handler)
   (error "not implemented!"))
-(define-method dsm-read-body ((self <dsm-protocol>) header input eof-handler)
+(define-method dsm-read-body
+    ((self <dsm-protocol>) header input eof-handler not-response-handler)
   (error "not implemented!"))
 (define-method dsm-write-header ((self <dsm-protocol>) header output)
   (error "not implemented!"))
@@ -24,7 +26,7 @@
   (error "not implemented!"))
 
 
-(define (read-with-timeout input reader timeout not-response-handler)
+(define (read-with-timeout input reader timeout timeout-handler)
   (if (char-ready? input)
     (reader input)
     (let ((result #f)
@@ -41,17 +43,17 @@
                       (lambda (cont)
                         (set! retry cont)))
                      (selector-select selector timeout)))
-          (not-response-handler retry)
+          (timeout-handler retry)
           result)))))
 
-(define (read-required-block input size eof-handler)
+(define (read-required-block input size eof-handler not-response-handler)
   (define (more-read size)
     (define retry-count 3)
     (read-with-timeout input (make-reader size) (list 3 0)
                        (lambda (retry)
                          (dec! retry-count)
                          (if (< retry-count 0)
-                           (error "not response")
+                           (not-response-handler)
                            (retry)))))
   
   (define (make-reader size)

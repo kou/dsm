@@ -31,11 +31,16 @@
                            (get-handler raise-if-error)
                            (post-handler raise-if-error)
                            (eof-handler (lambda ()
-                                          (print "Got eof from server"))))
+                                          (print "Got eof from server")))
+                           (not-response-handler
+                            (lambda ()
+                              (error "not response from server"))))
     (define (dsm-handler)
       (dsm-write protocol command marshaled-obj out)
       (receive (header body)
-          (dsm-read protocol in :eof-handler eof-handler)
+          (dsm-read protocol in
+                    :eof-handler eof-handler
+                    :not-response-handler not-response-handler)
         (handle-response header body)))
 
     (define (handle-response header body)
@@ -53,7 +58,8 @@
                               :command "response"
                               :get-handler get-handler
                               :post-handler post-handler
-                              :eof-handler eof-handler)))
+                              :eof-handler eof-handler
+                              :not-response-handler not-response-handler)))
               (else obj))))
     
     (define (response-handler obj)
@@ -69,9 +75,14 @@
 
 (define (dsm-response protocol table input output . keywords)
   (let-keywords* keywords ((eof-handler (lambda ()
-                                          (print "Got eof from client"))))
+                                          (print "Got eof from client")))
+                           (not-response-handler
+                            (lambda ()
+                              (error "not response from client"))))
     (receive (header body)
-        (dsm-read protocol input :eof-handler eof-handler)
+        (dsm-read protocol input
+                  :eof-handler eof-handler
+                  :not-response-handler not-response-handler)
       (let ((marshalized-body (marshal
                                table
                                (apply handle-dsm-body
@@ -101,10 +112,13 @@
     (debug (list "write" header body))))
 
 (define (dsm-read protocol input . keywords)
-  (let-keywords* keywords ((eof-handler (lambda () "Got eof")))
+  (let-keywords* keywords ((eof-handler (lambda () "Got eof"))
+                           (not-response-handler
+                            (lambda () (error "not response"))))
     (define (read-header)
       (debug (list "reading header..."))
-      (let ((header (dsm-read-header protocol input eof-handler)))
+      (let ((header (dsm-read-header protocol input
+                                     eof-handler not-response-handler)))
         (debug header)
         (if (eof-object? header)
           (eof-handler)
@@ -113,7 +127,8 @@
     (define (read-body header)
       (debug (list "reading body..."))
       (read-from-string (ces-convert
-                         (dsm-read-body protocol header input eof-handler)
+                         (dsm-read-body protocol header input
+                                        eof-handler not-response-handler)
                          (encoding-of header))))
 
     (debug (list "reading..." input))

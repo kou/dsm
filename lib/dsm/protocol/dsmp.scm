@@ -18,17 +18,20 @@
                      #`"c=,(command-of header)")
                dsmp-delimiter))
 
-(define-method dsm-read-header ((self <dsmp>) input eof-handler)
+(define-method dsm-read-header
+    ((self <dsmp>) input eof-handler not-response-handler)
   (define counter 3)
   (read-with-timeout input read-line (list 10 0)
                      (lambda (retry)
                        (dec! counter)
                        (if (> counter 0)
                          (retry)
-                         (error "not response")))))
+                         (not-response-handler)))))
 
-(define-method dsm-read-body ((self <dsmp>) header input eof-handler)
-  (read-required-block input (size-of header) eof-handler))
+(define-method dsm-read-body
+    ((self <dsmp>) header input eof-handler not-response-handler)
+  (read-required-block input (size-of header)
+                       eof-handler not-response-handler))
 
 (define-method dsm-write-header ((self <dsmp>) header output)
   (display header output)

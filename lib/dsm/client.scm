@@ -4,15 +4,13 @@
   (use gauche.net)
   (use marshal)
   (use dsm.common)
-  (export dsm-connect-server path-of)
-  )
+  (export dsm-connect-server path-of uri-of))
 (select-module dsm.client)
 
 (define-class <dsm-client> ()
   ((uri :init-keyword :uri :accessor uri-of)
    (socket :accessor socket-of)
-   (protocol :accessor protocol-of)
-   ))
+   (protocol :accessor protocol-of)))
 
 (define-method initialize ((self <dsm-client>) args)
   (define (invalid-type-message type)

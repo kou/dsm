@@ -31,7 +31,8 @@
                      #`"X-DOH-Command: ,(command-of header)")
                doh-delimiter))
 
-(define-method dsm-read-header ((self <dsmp-over-http>) input eof-handler)
+(define-method dsm-read-header
+    ((self <dsmp-over-http>) input eof-handler not-response-handler)
   (define counter 3)
   (define (next-line)
     (read-with-timeout input read-line (list 10 0)
@@ -39,7 +40,7 @@
                          (dec! counter)
                          (if (> counter 0)
                            (retry)
-                           (error "not response")))))
+                           (not-response-handler)))))
   
   (let loop ((result '())
              (line (next-line)))
@@ -55,8 +56,10 @@
                        result)
                  (next-line))))))
 
-(define-method dsm-read-body ((self <dsmp-over-http>) header input eof-handler)
-  (read-required-block input (size-of header) eof-handler))
+(define-method dsm-read-body
+    ((self <dsmp-over-http>) header input eof-handler not-response-handler)
+  (read-required-block input (size-of header)
+                       eof-handler not-response-handler))
 
 (define-method dsm-write-header ((self <dsmp-over-http>) header output)
   (display header output)
