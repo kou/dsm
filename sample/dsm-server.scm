@@ -11,4 +11,6 @@
     (add-mount-point! server "/plus-macro" plus-macro)
     (add-mount-point! server '/for-each for-each)
     (add-mount-point! server '/map map)
+    (add-mount-point! server '/long-string
+                      (call-with-input-file "lib/dsm/common.scm" port->string))
     (start-dsm-server server)))

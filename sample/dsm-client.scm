@@ -10,4 +10,5 @@
     (newline)
     (let ((x 10))
       (print ((client "/map") (lambda (elem) (+ elem x))
-                              '(1 2))))))
+                              '(1 2))))
+    (print (client "/long-string"))))
