@@ -4,8 +4,9 @@
 (use file.util)
 (use test.unit)
 
-(if (symbol-bound? 'main)
-    (define _main main))
+(if (and (symbol-bound? 'main)
+         (not (symbol-bound? '_main)))
+  (define _main main))
 
 (define (main args)
   (let ((dir (sys-dirname (car args))))

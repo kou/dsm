@@ -64,7 +64,7 @@
       #f)))
 
 (define (make-dsm-server uri . keywords)
-  (apply make <dsm-server> (append (list :uri uri) keywords)))
+  (apply make <dsm-server> :uri uri keywords))
 
 (define-method add-mount-point! ((self <dsm-server>) mount-point value)
   (hash-table-put! (mount-table-of self)
@@ -76,7 +76,7 @@
         (key (x->string mount-point)))
     (if (hash-table-exists? table key)
       (hash-table-get table key)
-      (make-dsmp-error #`"No such mount point: ,|mount-point|"))))
+      (make-dsm-error #`"No such mount point: ,|mount-point|"))))
 
 (define-method get-by-id ((self <dsm-server>) id)
   (id-ref (marshal-table-of self) id))

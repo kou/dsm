@@ -12,12 +12,17 @@
                                    :port port)))
 
 (define (test-dsm-server-run command host port)
-  (begin0
-      (run-process command
-                   #`"--host=,host"
-                   #`"--port=,port")
-    (sys-nanosleep 1000000000) ; wait for starting server
-    ))
+  (let ((server (run-process command
+                             #`"--host=,host"
+                             #`"--port=,port")))
+    (do ()
+        ((with-error-handler
+             (lambda (e) #f)
+           (lambda ()
+             ((connect-dsmp-server host port))
+             #t)))
+      (sys-nanosleep 1000)) ; wait for starting server
+    server))
 
 (let* ((server-command "./test/dsm-server.scm")
        (server-host "localhost")

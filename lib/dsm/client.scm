@@ -51,12 +51,17 @@
          (in (socket-input-port socket :buffering :modest))
          (out (socket-output-port socket :buffering :full))
          (table (make-marshal-table)))
-    (lambda (mount-point)
-      (apply dsm-request
-             (protocol-of client)
-             (marshal table mount-point)
-             table in out
-;;             :post-handler (lambda (obj) obj)
-             keywords))))
+    (lambda args
+      (let-optionals* args ((mount-point #f))
+        (if mount-point
+          (if (eq? 'CONNECTED (socket-status (socket-of client)))
+            (apply dsm-request
+                   (protocol-of client)
+                   (marshal table mount-point)
+                   table in out
+                   ;; :post-handler (lambda (obj) obj)
+                   keywords)
+            (error "doesn't connected."))
+          (socket-shutdown (socket-of client) 2))))))
 
 (provide "dsm/client")
