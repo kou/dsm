@@ -92,7 +92,8 @@
 
 (define (make-dsmp-header-from-string str . keywords)
   (make-dsmp-header`(("v" . ,dsmp-version)
-                     ("e" . ,(ces-guess-from-string str "*JP"))
+                     ("e" . ,(or (ces-guess-from-string str "*JP")
+                                 "UTF-8"))
                      ("s" . ,(string-size str))
                      ("c" . ,(get-keyword :command keywords)))))
 
@@ -152,20 +153,25 @@
 
 (define (dsmp-request marshaled-obj table in out . keywords)
   (define (show-error message stack-trace)
-    (display (format "*** ERROR: ~s\n" message)
+    (display (format "~a\n" message)
              (current-error-port))
     (with-module gauche.vm.debugger
       (debug-print-stack stack-trace
                          *stack-show-depth*)))
-  (define (report-if-error obj)
+  (define (raise-if-error obj)
     (if (dsmp-error? obj)
-        (show-error (message-of obj)
-                    (stack-trace-of obj))
+        (error (with-output-to-string
+                 (lambda ()
+                   (with-error-to-port
+                    (current-output-port)
+                    (lambda ()
+                      (show-error (message-of obj)
+                                  (stack-trace-of obj)))))))
         obj))
   
   (let-keywords* keywords ((command "get")
-                           (get-handler report-if-error)
-                           (post-handler report-if-error)
+                           (get-handler raise-if-error)
+                           (post-handler raise-if-error)
                            (eof-handler (lambda ()
                                           (print "Got eof from server"))))
     (define (dsmp-handler)
@@ -213,6 +219,17 @@
          :command "eval"
          keywords))
 
+(define (eval-in-anonymous-module proc args)
+  (let ((mod (make-module #f))
+        (sym (gensym)))
+    (eval `(define ,sym ,proc) mod)
+    (eval `(,sym ,@(map (lambda (elem)
+                          (if (list? elem)
+                              (cons list elem)
+                              elem))
+                        args))
+          mod)))
+
 (define (handle-dsmp-body command body table in out . keywords)
   (let-keywords* keywords ((response-handler (lambda (x) x))
                            (get-handler (lambda (x) x))
@@ -225,16 +242,17 @@
                           :port
                           :stack-trace (cdr (vm-get-stack-trace))))
             (lambda ()
-              (apply (unmarshal table (car body))
-                     (map (lambda (elem)
-                            (let ((obj (unmarshal table elem)))
-                              (if (need-remote-eval? obj table)
-                                  (lambda arg
-                                    (eval-in-remote obj arg table
-                                                    in out
-                                                    :post-handler post-handler))
-                                  obj)))
-                          (cdr body))))))
+              (eval-in-anonymous-module
+               (unmarshal table (car body))
+               (map (lambda (elem)
+                      (let ((obj (unmarshal table elem)))
+                        (if (need-remote-eval? obj table)
+                            (lambda arg
+                              (eval-in-remote obj arg table
+                                              in out
+                                              :post-handler post-handler))
+                            obj)))
+                    (cdr body))))))
           ((string=? "response" command) (response-handler body))
           ((string=? "get" command) (get-handler body))
           (else (error "unknown command" command)))))
