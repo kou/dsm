@@ -14,11 +14,11 @@ GPL or BSD License
 
 == メーリングリスト
 
-((<COZMIXNG RWiki - 連絡先|URL:http://www.cozmixng.org/~rwiki/index.rb?cmd=view;name=%CF%A2%CD%ED%C0%E8>))を御覧下さい．
+((<COZMIXNG RWiki - 連絡先|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=%CF%A2%CD%ED%C0%E8>))を御覧下さい．
 
 == なにこれ？
 
-((<marshal|URL:http://www.cozmixng.org/~rwiki/index.rb?cmd=view;name=marshal>))を用いたサーバ/クライアント方式の簡易分散Schemeライブラリです．
+((<marshal|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=marshal>))を用いたサーバ/クライアント方式の簡易分散Schemeライブラリです．
 
 以下のような機能があります．
 

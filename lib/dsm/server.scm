@@ -1,6 +1,7 @@
 (define-module dsm.server
   (extend dsm.dsm)
   (use srfi-13)
+  (use gauche.time)
   (use gauche.net)
   (use gauche.threads)
   (use gauche.selector)
@@ -8,6 +9,7 @@
   (use marshal)
   (use dsm.common)
   (export make-dsm-server start-dsm-server stop-dsm-server
+          dsm-server-join!
           socket-of
           add-mount-point! get-by-mount-point get-by-id
           require-in-root-thread required-in-root-thread?)
@@ -18,6 +20,7 @@
   ((host :init-keyword :host :accessor host-of :init-value #f)
    (port :init-keyword :port :accessor port-of :init-value 59102)
    (socket :accessor socket-of)
+   (thread :accessor thread-of)
    (mount-table :accessor mount-table-of
                 :init-form (make-hash-table 'string=?))
    (marshal-table :accessor marshal-table-of
@@ -42,8 +45,11 @@
                    value))
 
 (define-method get-by-mount-point ((self <dsm-server>) mount-point)
-  (hash-table-get (mount-table-of self)
-                  (x->string mount-point)))
+  (let ((table (mount-table-of self))
+        (key (x->string mount-point)))
+    (if (hash-table-exists? table key)
+      (hash-table-get table key)
+      (make-dsmp-error #`"No such mount point: ,|mount-point|"))))
 
 (define-method get-by-id ((self <dsm-server>) id)
   (id-ref (marshal-table-of self) id))
@@ -112,9 +118,24 @@
 (define (reset-required-in-root-thread)
   (condition-variable-specific-set! (dsm-cv) #f))
 
-(define-method start-dsm-server ((self <dsm-server>))
+(define (set-dsm-server-thread! server thunk)
+  (cond (dsm-thread-disable
+         (set! (thread-of server) #f)
+         (thunk))
+        (else
+         (set! (thread-of server) (make-thread thunk))
+         (thread-start! (thread-of server)))))
+
+(define (dsm-server-join! server)
+  (if (thread-of server)
+    ;; (thread-join! (thread-of server))
+    (read)
+    ))
+
+(define-method start-dsm-server ((self <dsm-server>) . args)
   (let ((selector (make <selector>))
-        (pool (make <thread-pool>)))
+        (pool (make <thread-pool>))
+        (handler (get-optional args #f)))
 
     (define (accept-handler sock flag)
       (let* ((client (socket-accept (socket-of self)))
@@ -155,9 +176,12 @@
     (parameterize ((dsm-cv (make-condition-variable))
                    (dsm-mu (make-mutex)))
       (reset-required-in-root-thread)
-      (do () ((eq? 'shutdown (socket-status (socket-of self))))
-        (if (mutex-synchronize
-             (dsm-mu)
+      (set-dsm-server-thread!
+       self
+       (lambda ()
+         (do () ((eq? 'shutdown (socket-status (socket-of self))))
+           (if (mutex-synchronize
+                (dsm-mu)
                 (lambda ()
                   (if (and (pair? (condition-variable-specific (dsm-cv)))
                            (not dsm-thread-disable))
@@ -169,8 +193,10 @@
                       (condition-variable-specific-set! (dsm-cv) #t)
                       #t)
                     #f)))
-          (thread-yield!))
-        (selector-select selector (timeout-of self))))))
+             (thread-yield!))
+           (if handler
+             (handler self))
+           (selector-select selector (timeout-of self))))))))
 
 (define-method stop-dsm-server ((self <dsm-server>))
   (socket-close (socket-of self))

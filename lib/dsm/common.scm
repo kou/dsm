@@ -7,9 +7,11 @@
   (use gauche.net)
   (use gauche.selector)
   (use gauche.charconv)
+  (use gauche.time)
   (use gauche.vm.debugger)
   (use marshal)
   (export dsmp-request dsmp-response
+          make-dsmp-error
           version-of encoding-of size-of)
   )
 (select-module dsm.common)
@@ -19,12 +21,15 @@
 
 (define *dsmp-debug* #f)
 
-(define (debug . messages)
-  (if *dsmp-debug*
-    (let ((printer (if (symbol-bound? 'p)
-                     p
-                     print)))
-      (apply printer messages))))
+(define-syntax debug
+  (syntax-rules ()
+    ((_ message ...)
+     (if *dsmp-debug*
+       (let ((printer (if (symbol-bound? 'p)
+                          p
+                          print)))
+         (printer message ...))
+       #f))))
 
 (define-class <dsmp-error> ()
   ((message :init-keyword :message :accessor message-of)
@@ -74,6 +79,11 @@
 (define (dsmp-error? obj)
   (is-a? obj <dsmp-error>))
 
+(define (make-dsmp-error message)
+  (make <dsmp-error>
+    :message message
+    :stack-trace (cdr (vm-get-stack-trace))))
+
 (define-class <dsmp-header> ()
   ((version :init-keyword :version :accessor version-of)
    (encoding :init-keyword :encoding :accessor encoding-of)
@@ -120,17 +130,19 @@
 
 (define (parse-dsmp-header str)
   (make-dsmp-header (map (lambda (elem)
-                          (let ((splited-elem (string-split elem "=")))
-                            (cons (car splited-elem)
-                                  (cadr splited-elem))))
-                        (string-split (string-trim-right str)
-                                      dsmp-delimiter))))
+                           (let ((splited-elem (string-split elem "=")))
+                             (cons (car splited-elem)
+                                   (cadr splited-elem))))
+                         (string-split (string-trim-right str)
+                                       dsmp-delimiter))))
 
 (define (dsmp-write header body output)
   (debug (list "writing..." output))
   (debug (list "write" header body))
+  ;; (set! (port-buffering output) :line)
   (display header output)
   (display "\n" output)
+  ;; (set! (port-buffering output) :full)
   (display body output)
   (flush output))
 
@@ -153,14 +165,21 @@
                        (selector-delete! selector input #f #f)
                        (set! result (reader in)))
                      '(r))
-         (if (zero? (selector-select selector timeout))
-           (not-response-handler)
-           result))))
+      (let ((retry #f))
+        (if (zero? (begin
+                     (call/cc
+                      (lambda (cont)
+                        (set! retry cont)))
+                     (selector-select selector timeout)))
+          (not-response-handler retry)
+          result)))))
 
 (define (dsmp-read-header input eof-handler)
   (debug (list "reading header..."))
-  (let ((header (read-with-timeout input read-line (list 3 0)
-                                   (lambda () (error "not response")))))
+  (let ((header (read-with-timeout input read-line #f
+                                   (lambda (retry)
+                                     ;; never come here
+                                     (error "not response")))))
     (debug header)
     (if (eof-object? header)
         (eof-handler)
@@ -173,8 +192,13 @@
 
 (define (read-required-block input size eof-handler)
   (define (more-read size)
+    (define retry-count 3)
     (read-with-timeout input (make-reader size) (list 3 0)
-                       (lambda () (error "not response"))))
+                       (lambda (retry)
+                         (dec! retry-count)
+                         (if (< retry-count 0)
+                           (error "not response")
+                           (retry)))))
   
   (define (make-reader size)
     (lambda (in . args)
@@ -285,11 +309,7 @@
                            (post-handler (lambda (x) x)))
     (cond ((string=? "eval" command)
            (with-error-handler
-            (lambda (e) (make <dsmp-error>
-                          :message (slot-ref e 'message)
-                          :host 
-                          :port
-                          :stack-trace (cdr (vm-get-stack-trace))))
+            (lambda (e) (make-dsmp-error (slot-ref e 'message)))
             (lambda ()
               (eval-in-anonymous-module
                (unmarshal table (car body))

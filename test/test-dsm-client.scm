@@ -5,23 +5,26 @@
 (use dsm.client)
 (load "test/dsm-server-conf")
 
+(define (test-dsm-server-run command host port)
+  (begin0
+      (run-process command
+                   #`"--host=,host"
+                   #`"--port=,port")
+    (sys-nanosleep 1000000000) ; wait for starting server
+    ))
+
 (let* ((server-command "./test/dsm-server.scm")
        (server-host "localhost")
-       (server-port 59102)
-       (process #f))
+       (server-port 59104)
+       (process (test-dsm-server-run server-command server-host server-port)))
   (define-test-case "Server test"
-     (setup
-      (lambda ()
-        (set! process
-              (begin0
-                  (run-process server-command
-                               "--host" server-host
-                               "--port" server-port)
-                (sys-nanosleep 1000000000) ; wait for starting server
-                ))))
-     (teardown
-      (lambda ()
-        (process-kill process)))
+;;      (setup
+;;       (lambda ()
+;;         (set! process
+;;               (test-dsm-server-run server-command server-host server-port))))
+;;      (teardown
+;;       (lambda ()
+;;         (process-kill process)))
     ("marshalizable object test"
      (let ((server (connect-server :host server-host
                                    :port server-port)))
@@ -41,5 +44,4 @@
                                                :port server-port)))
                    (assert-equal (caddr elem)
                                  (apply (server (car elem)) (cdddr elem)))))
-               procedure-list))
-    ))
+               procedure-list))))

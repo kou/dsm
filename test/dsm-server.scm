@@ -50,5 +50,7 @@
        (for-each (lambda (elem)
                    (add-mount-point! server (car elem) (cadr elem)))
                  procedure-list)
-       (start-dsm-server server)))
+       (start-dsm-server server)
+       (dsm-server-join! server)
+       (stop-dsm-server server)))
    0)
