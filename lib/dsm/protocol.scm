@@ -2,6 +2,7 @@
   (extend dsm.protocol.dsmp
           dsm.protocol.http)
   (use gauche.charconv)
+  (use gauche.collection)
   (use msm.marshal)
   (use dsm.utils)
   (use dsm.error)
@@ -65,13 +66,17 @@
               (else obj))))
     
     (define (response-handler obj)
-      (if (need-remote-eval? obj table)
-          (lambda arg
-            (eval-in-remote protocol obj arg table in out
-                            :get-handler get-handler
-                            :post-handler post-handler
-                            :eof-handler eof-handler))
-          (post-handler obj)))
+      (cond ((need-remote-eval? obj table)
+             (lambda arg
+               (eval-in-remote protocol obj arg table in out
+                               :get-handler get-handler
+                               :post-handler post-handler
+                               :eof-handler eof-handler)))
+            ((and (is-a? obj <collection>)
+                  (not (string? obj)))
+             (map-to (class-of obj) response-handler obj))
+            (else
+             (post-handler obj))))
 
     (dsm-handler)))
 
