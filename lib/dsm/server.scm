@@ -48,26 +48,61 @@
 (define-method get-by-id ((self <dsm-server>) id)
   (id-ref (marshal-table-of self) id))
 
+(define dsm-thread-disable (eq? 'none (gauche-thread-type)))
+
 (define-class <thread-pool> ()
   ((pool :accessor pool-of :init-form '())
    (max :accessor max-of :init-value #f)))
 
 (define-method thread-pool-push! ((self <thread-pool>) thunk)
-  (if #t ;; (eq? 'none (gauche-thread-type)))
+  (if dsm-thread-disable
     (thunk)
-    (thread-start! (make-thread thunk))))
+    ;; (thread-join! (thread-start! (make-thread thunk)))
+    (thread-start! (make-thread thunk))
+    ))
+
+(define (mutex-synchronize mutex thunk)
+  (dynamic-wind
+    (lambda () (mutex-lock! mutex))
+    thunk
+    (lambda () (mutex-unlock! mutex))))
+
+(define dsm-thread-mutex-table-mutex (make-mutex))
+(define dsm-thread-mutex-table (make-hash-table 'equal?))
+
+(define (dsm-thread-mutex-get socket)
+  (mutex-synchronize
+   dsm-thread-mutex-table-mutex
+   (lambda ()
+     (let* ((key (socket-fd socket))
+            (mutex (hash-table-get dsm-thread-mutex-table key #f)))
+         (if mutex
+           mutex
+           (begin
+             (let ((mutex (make-mutex)))
+               (hash-table-put! dsm-thread-mutex-table key mutex)
+               mutex)))))))
+
+(define (dsm-thread-mutex-delete! socket)
+  (mutex-synchronize
+   dsm-thread-mutex-table-mutex
+   (lambda ()
+     (let* ((key (socket-fd socket-fd))
+            (mutex (hash-table-get dsm-thread-mutex-table key)))
+       (hash-table-delete! dsm-thread-mutex-table key)))))
 
 (define dsm-cv (make-parameter (make-condition-variable)))
 (define dsm-mu (make-parameter (make-mutex)))
 (define (require-in-root-thread path mod)
-  (if #t ;; (eq? 'none (gauche-thread-type))
+  (if dsm-thread-disable
     (begin
       (eval `(require ,path) mod)
       (condition-variable-specific-set! (dsm-cv) #t))
     (begin
-      (mutex-lock! (dsm-mu))
-      (condition-variable-specific-set! (dsm-cv) (cons path mod))
-      (mutex-unlock! (dsm-mu))
+      (mutex-synchronize
+       (dsm-mu)
+       (lambda ()
+         (condition-variable-specific-set! (dsm-cv) (cons path mod))))
       (condition-variable-signal! (dsm-cv))
       (thread-yield!))))
 
@@ -84,6 +119,7 @@
     (define (accept-handler sock flag)
       (let* ((client (socket-accept (socket-of self)))
              (output (socket-output-port client :buffering :none)))
+        ;; (p (socket-fd client))
         (selector-add! selector
                        (socket-input-port client :buffering :none)
                        (lambda (input flag)
@@ -96,16 +132,20 @@
     (define (handle-dsmp client input output)
       (call/cc
        (lambda (cont)
-         (dsmp-response (marshal-table-of self)
-                        input output
-                        :get-handler (cut get-by-mount-point self <>)
-                        :eof-handler (cut (make-eof-handler cont)
-                                          client input output)))))
+         (mutex-synchronize
+          (dsm-thread-mutex-get client)
+          (lambda ()
+            (dsmp-response (marshal-table-of self)
+                           input output
+                           :get-handler (cut get-by-mount-point self <>)
+                           :eof-handler (cut (make-eof-handler cont)
+                                             client input output)))))))
     
     (define (make-eof-handler return)
       (lambda (client input output)
         (selector-delete! selector input #f #f)
         (socket-shutdown client 2)
+        ;; (p "finished!")
         (return 0)))
                      
     (selector-add! selector
@@ -116,17 +156,20 @@
                    (dsm-mu (make-mutex)))
       (reset-required-in-root-thread)
       (do () ((eq? 'shutdown (socket-status (socket-of self))))
-        (mutex-lock! (dsm-mu))
-        (if (pair? (condition-variable-specific (dsm-cv)))
-          (unless #t ;; (eq? 'none (gauche-thread-type))
-            ;; (p (current-thread) (condition-variable-specific (dsm-cv)))
-            ;; (load (condition-variable-specific (dsm-cv)))
-            (eval `(require ,(car (condition-variable-specific (dsm-cv))))
-                  (cdr (condition-variable-specific (dsm-cv))))
-            (condition-variable-specific-set! (dsm-cv) #t)
-            (mutex-unlock! (dsm-mu))
-            (thread-yield!))
-          (mutex-unlock! (dsm-mu)))
+        (if (mutex-synchronize
+             (dsm-mu)
+                (lambda ()
+                  (if (and (pair? (condition-variable-specific (dsm-cv)))
+                           (not dsm-thread-disable))
+                    (begin
+                      ;; (p (current-thread) (condition-variable-specific (dsm-cv)))
+                      ;; (load (condition-variable-specific (dsm-cv)))
+                      (eval `(require ,(car (condition-variable-specific (dsm-cv))))
+                            (cdr (condition-variable-specific (dsm-cv))))
+                      (condition-variable-specific-set! (dsm-cv) #t)
+                      #t)
+                    #f)))
+          (thread-yield!))
         (selector-select selector (timeout-of self))))))
 
 (define-method stop-dsm-server ((self <dsm-server>))
