@@ -53,18 +53,23 @@
    (max :accessor max-of :init-value #f)))
 
 (define-method thread-pool-push! ((self <thread-pool>) thunk)
-  (if (eq? 'none (gauche-thread-type))
+  (if #t ;; (eq? 'none (gauche-thread-type)))
     (thunk)
     (thread-start! (make-thread thunk))))
 
 (define dsm-cv (make-parameter (make-condition-variable)))
 (define dsm-mu (make-parameter (make-mutex)))
 (define (require-in-root-thread path mod)
-  (mutex-lock! (dsm-mu))
-  (condition-variable-specific-set! (dsm-cv) (cons path mod))
-  (mutex-unlock! (dsm-mu))
-  (condition-variable-signal! (dsm-cv))
-  (thread-yield!))
+  (if #t ;; (eq? 'none (gauche-thread-type))
+    (begin
+      (eval `(require ,path) mod)
+      (condition-variable-specific-set! (dsm-cv) #t))
+    (begin
+      (mutex-lock! (dsm-mu))
+      (condition-variable-specific-set! (dsm-cv) (cons path mod))
+      (mutex-unlock! (dsm-mu))
+      (condition-variable-signal! (dsm-cv))
+      (thread-yield!))))
 
 (define (required-in-root-thread?)
   (eq? #t (condition-variable-specific (dsm-cv))))
@@ -78,9 +83,9 @@
 
     (define (accept-handler sock flag)
       (let* ((client (socket-accept (socket-of self)))
-             (output (socket-output-port client)))
+             (output (socket-output-port client :buffering :none)))
         (selector-add! selector
-                       (socket-input-port client :buffering? :none)
+                       (socket-input-port client :buffering :none)
                        (lambda (input flag)
                          (thread-pool-push!
                           pool
@@ -113,7 +118,7 @@
       (do () ((eq? 'shutdown (socket-status (socket-of self))))
         (mutex-lock! (dsm-mu))
         (if (pair? (condition-variable-specific (dsm-cv)))
-          (begin
+          (unless #t ;; (eq? 'none (gauche-thread-type))
             ;; (p (current-thread) (condition-variable-specific (dsm-cv)))
             ;; (load (condition-variable-specific (dsm-cv)))
             (eval `(require ,(car (condition-variable-specific (dsm-cv))))

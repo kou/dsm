@@ -4,6 +4,7 @@
   (use srfi-10)
   (use srfi-13)
   (use gauche.net)
+  (use gauche.selector)
   (use gauche.charconv)
   (use gauche.vm.debugger)
   (use marshal)
@@ -141,6 +142,7 @@
       (values header body))))
   
 (define (read-dsmp-header input eof-handler)
+  (debug (list "reading header..."))
   (let ((header (read-line input)))
     (debug header)
     (if (eof-object? header)
@@ -148,11 +150,42 @@
         (parse-dsmp-header header))))
 
 (define (read-dsmp-body header input eof-handler)
-  (let ((body (read-block (size-of header) input)))
-    (debug body)
-    (if (eof-object? body)
-        (eof-handler)
-        (read-from-string (ces-convert body (encoding-of header))))))
+  (read-from-string (ces-convert
+                     (read-required-block input (size-of header) eof-handler)
+                     (encoding-of header))))
+
+(define (read-required-block input size eof-handler)
+  (define (more-read size)
+    (call/cc
+     (lambda (return)
+       (let ((reader (make-reader size return))
+             (selector (make <selector>)))
+         (if (char-ready? input)
+           (reader input)
+           (begin
+             (selector-add! selector
+                            input
+                            reader
+                            '(r))
+             (if (zero? (selector-select selector (list 3 0)))
+               (error "not response"))))))))
+  
+  (define (make-reader size return)
+    (lambda (in . args)
+      (return (read-block size in))))
+
+  (debug (list "reading body..."))
+  (let ((block (more-read size)))
+    (debug (list "read body" block))
+    (cond ((eof-object? block) (eof-handler))
+          ((< (string-size block) size)
+           (debug (list "more reading..." size (string-size block)
+                        (- size (string-size block))))
+           (string-append block
+                          (more-read (- size (string-size block)))))
+          (else
+           (debug (list "got block" block))
+           block))))
 
 (define (need-remote-eval? obj table)
   (and (reference-object? obj)
