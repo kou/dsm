@@ -116,7 +116,8 @@
                                       dsmp-delimiter))))
 
 (define (dsmp-write header body output)
-;;  (p (list "write" header body))
+  ;; (p (list "writing..." output))
+  ;; (p (list "write" header body))
   (display header output)
   (display "\n" output)
   (display body output)
@@ -124,7 +125,7 @@
 
 (define (read-dsmp input . keywords)
   (let-keywords* keywords ((eof-handler (lambda () "Got eof")))
-    ;; (p (list "reading..."))
+    ;; (p (list "reading..." input))
     (let* ((header (read-dsmp-header input eof-handler))
            (body (read-dsmp-body header input eof-handler)))
       ;; (p (list "read" (dsmp-header->string header) body))
@@ -132,15 +133,15 @@
   
 (define (read-dsmp-header input eof-handler)
   (let ((header (read-line input)))
-;;    (p header)
+    ;; (p header)
     (if (eof-object? header)
         (eof-handler)
         (parse-dsmp-header header))))
 
 (define (read-dsmp-body header input eof-handler)
-;;  (p header)
+  ;; (p header)
   (let ((body (read-block (size-of header) input)))
-;;    (p body)
+    ;; (p body)
     (if (eof-object? body)
         (eof-handler)
         (read-from-string (ces-convert body
