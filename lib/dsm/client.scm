@@ -31,7 +31,7 @@
       (apply dsmp-request
              (marshal table mount-point) table
              in out
-             :post-handler (lambda (obj) obj)
+;;             :post-handler (lambda (obj) obj)
              keywords))))
 
 (provide "dsm/client")

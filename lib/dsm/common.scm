@@ -1,9 +1,11 @@
 (define-module dsm.common
   (extend dsm.dsm)
   (use text.tree)
+  (use srfi-10)
   (use srfi-13)
   (use gauche.net)
   (use gauche.charconv)
+  (use gauche.vm.debugger)
   (use marshal)
   (export dsmp-request dsmp-response
           version-of encoding-of size-of)
@@ -12,6 +14,54 @@
 
 (define dsmp-version 1)
 (define dsmp-delimiter ";")
+
+(define-class <dsmp-error> ()
+  ((message :init-keyword :message :accessor message-of)
+   (stack-trace :init-keyword :stack-trace :accessor stack-trace-of)))
+
+(define-method initialize ((self <dsmp-error>) args)
+  (next-method)
+  (let-keywords* args ((stack-trace-source #f))
+    (if stack-trace-source
+        (set! (stack-trace-of self)
+              (make-stack-trace-from-source stack-trace-source)))))
+
+(define (make-stack-trace-from-source src)
+  (map (lambda (s)
+         (if (car s)
+             (pair-attribute-set! (cadr s) 'source-info (car s)))
+         (cdr s))
+       src))
+
+(define (make-stack-trace-source st)
+  (map (lambda (s)
+         (let ((info (if (pair? (car s))
+                         (pair-attribute-get (car s) 'source-info #f)
+                         #f)))
+           (cons (if info
+                     (cons (format "~a:~a"
+                                   (sys-gethostname)
+                                   (car info))
+                           (cdr info))
+                     #f)
+                 s)))
+       st))
+
+(define-method write-object ((self <dsmp-error>) out)
+  (format out "#,(<dsmp-error> :message ~s :stack-trace-source ~a)"
+          (message-of self)
+          (marshal (make-marshal-table)
+                   (make-stack-trace-source (stack-trace-of self)))))
+
+(define-reader-ctor '<dsmp-error>
+  (lambda args
+    (apply make <dsmp-error> args)))
+
+(define-method marshalizable? ((self <dsmp-error>))
+  #t)
+
+(define (dsmp-error? obj)
+  (is-a? obj <dsmp-error>))
 
 (define-class <dsmp-header> ()
   ((version :init-keyword :version :accessor version-of)
@@ -101,9 +151,21 @@
        (not (using-same-table? table obj))))
 
 (define (dsmp-request marshaled-obj table in out . keywords)
+  (define (show-error message stack-trace)
+    (display (format "*** ERROR: ~s\n" message)
+             (current-error-port))
+    (with-module gauche.vm.debugger
+      (debug-print-stack stack-trace
+                         *stack-show-depth*)))
+  (define (report-if-error obj)
+    (if (dsmp-error? obj)
+        (show-error (message-of obj)
+                    (stack-trace-of obj))
+        obj))
+  
   (let-keywords* keywords ((command "get")
-                           (get-handler (lambda (x) x))
-                           (post-handler (lambda (x) x))
+                           (get-handler report-if-error)
+                           (post-handler report-if-error)
                            (eof-handler (lambda ()
                                           (print "Got eof from server"))))
     (define (dsmp-handler)
@@ -156,16 +218,23 @@
                            (get-handler (lambda (x) x))
                            (post-handler (lambda (x) x)))
     (cond ((string=? "eval" command)
-           (apply (unmarshal table (car body))
-                  (map (lambda (elem)
-                         (let ((obj (unmarshal table elem)))
-                           (if (need-remote-eval? obj table)
-                               (lambda arg
-                                 (eval-in-remote obj arg table
-                                                 in out
-                                                 :post-handler post-handler))
-                               obj)))
-                       (cdr body))))
+           (with-error-handler
+            (lambda (e) (make <dsmp-error>
+                          :message (slot-ref e 'message)
+                          :host 
+                          :port
+                          :stack-trace (cdr (vm-get-stack-trace))))
+            (lambda ()
+              (apply (unmarshal table (car body))
+                     (map (lambda (elem)
+                            (let ((obj (unmarshal table elem)))
+                              (if (need-remote-eval? obj table)
+                                  (lambda arg
+                                    (eval-in-remote obj arg table
+                                                    in out
+                                                    :post-handler post-handler))
+                                  obj)))
+                          (cdr body))))))
           ((string=? "response" command) (response-handler body))
           ((string=? "get" command) (get-handler body))
           (else (error "unknown command" command)))))
