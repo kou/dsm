@@ -114,7 +114,7 @@
         (mutex-lock! (dsm-mu))
         (if (pair? (condition-variable-specific (dsm-cv)))
           (begin
-            (p (current-thread) (condition-variable-specific (dsm-cv)))
+            ;; (p (current-thread) (condition-variable-specific (dsm-cv)))
             ;; (load (condition-variable-specific (dsm-cv)))
             (eval `(require ,(car (condition-variable-specific (dsm-cv))))
                   (cdr (condition-variable-specific (dsm-cv))))

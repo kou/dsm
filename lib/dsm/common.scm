@@ -15,6 +15,15 @@
 (define dsmp-version 1)
 (define dsmp-delimiter ";")
 
+(define *dsmp-debug* #f)
+
+(define (debug . messages)
+  (if *dsmp-debug*
+    (let ((printer (if (symbol-bound? 'p)
+                     p
+                     print)))
+      (apply printer messages))))
+
 (define-class <dsmp-error> ()
   ((message :init-keyword :message :accessor message-of)
    (stack-trace :init-keyword :stack-trace :accessor stack-trace-of)))
@@ -116,8 +125,8 @@
                                       dsmp-delimiter))))
 
 (define (dsmp-write header body output)
-  ;; (p (list "writing..." output))
-  ;; (p (list "write" header body))
+  (debug (list "writing..." output))
+  (debug (list "write" header body))
   (display header output)
   (display "\n" output)
   (display body output)
@@ -125,28 +134,25 @@
 
 (define (read-dsmp input . keywords)
   (let-keywords* keywords ((eof-handler (lambda () "Got eof")))
-    ;; (p (list "reading..." input))
+    (debug (list "reading..." input))
     (let* ((header (read-dsmp-header input eof-handler))
            (body (read-dsmp-body header input eof-handler)))
-      ;; (p (list "read" (dsmp-header->string header) body))
+      (debug (list "read" (dsmp-header->string header) body))
       (values header body))))
   
 (define (read-dsmp-header input eof-handler)
   (let ((header (read-line input)))
-    ;; (p header)
+    (debug header)
     (if (eof-object? header)
         (eof-handler)
         (parse-dsmp-header header))))
 
 (define (read-dsmp-body header input eof-handler)
-  ;; (p header)
   (let ((body (read-block (size-of header) input)))
-    ;; (p body)
+    (debug body)
     (if (eof-object? body)
         (eof-handler)
-        (read-from-string (ces-convert body
-                                       (encoding-of header)
-                                       (gauche-character-encoding))))))
+        (read-from-string (ces-convert body (encoding-of header))))))
 
 (define (need-remote-eval? obj table)
   (and (reference-object? obj)
