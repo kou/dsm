@@ -11,10 +11,10 @@
 (define-method dsm-header->string ((self <dsm-protocol>) header)
   (error "not implemented!"))
 (define-method dsm-read-header
-    ((self <dsm-protocol>) input eof-handler not-response-handler)
+    ((self <dsm-protocol>) input eof-handler not-response-handler timeout)
   (error "not implemented!"))
 (define-method dsm-read-body
-    ((self <dsm-protocol>) header input eof-handler not-response-handler)
+    ((self <dsm-protocol>) header input eof-handler not-response-handler timeout)
   (error "not implemented!"))
 (define-method dsm-write-header ((self <dsm-protocol>) header output)
   (error "not implemented!"))
@@ -46,10 +46,10 @@
           (timeout-handler retry)
           result)))))
 
-(define (read-required-block input size eof-handler not-response-handler)
+(define (read-required-block input size eof-handler not-response-handler timeout)
   (define (more-read size)
     (define retry-count 3)
-    (read-with-timeout input (make-reader size) (list 3 0)
+    (read-with-timeout input (make-reader size) timeout
                        (lambda (retry)
                          (dec! retry-count)
                          (if (< retry-count 0)

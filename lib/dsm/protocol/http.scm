@@ -19,6 +19,7 @@
 
 (define get-meta
   (with-module www.cgi get-meta))
+;;(define get-meta cgi-get-metavariable)
 
 (define-class <dsmp-over-http> (<dsm-protocol>)
   ((version :accessor version-of :init-value doh-version)))
@@ -32,10 +33,10 @@
                doh-delimiter))
 
 (define-method dsm-read-header
-    ((self <dsmp-over-http>) input eof-handler not-response-handler)
+    ((self <dsmp-over-http>) input eof-handler not-response-handler timeout)
   (define counter 3)
   (define (next-line)
-    (read-with-timeout input read-line (list 10 0)
+    (read-with-timeout input read-line timeout
                        (lambda (retry)
                          (dec! counter)
                          (if (> counter 0)
@@ -57,9 +58,9 @@
                  (next-line))))))
 
 (define-method dsm-read-body
-    ((self <dsmp-over-http>) header input eof-handler not-response-handler)
+    ((self <dsmp-over-http>) header input eof-handler not-response-handler timout)
   (read-required-block input (size-of header)
-                       eof-handler not-response-handler))
+                       eof-handler not-response-handler timeout))
 
 (define-method dsm-write-header ((self <dsmp-over-http>) header output)
   (display header output)

@@ -395,7 +395,8 @@
                           :not-response-handler
                           (lambda ()
                             (print "not resposne from client")
-                            (cont 0)))
+                            (cont 0))
+                          :timeout #f)
             ;; (p "SELECTOR")
             (selector-add! selector
                            input

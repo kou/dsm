@@ -34,13 +34,15 @@
                                           (print "Got eof from server")))
                            (not-response-handler
                             (lambda ()
-                              (error "not response from server"))))
+                              (error "not response from server")))
+                           (timeout (list 15 0)))
     (define (dsm-handler)
       (dsm-write protocol command marshaled-obj out)
       (receive (header body)
           (dsm-read protocol in
                     :eof-handler eof-handler
-                    :not-response-handler not-response-handler)
+                    :not-response-handler not-response-handler
+                    :timeout timeout)
         (handle-response header body)))
 
     (define (handle-response header body)
@@ -78,11 +80,13 @@
                                           (print "Got eof from client")))
                            (not-response-handler
                             (lambda ()
-                              (error "not response from client"))))
+                              (error "not response from client")))
+                           (timeout (list 15 0)))
     (receive (header body)
         (dsm-read protocol input
                   :eof-handler eof-handler
-                  :not-response-handler not-response-handler)
+                  :not-response-handler not-response-handler
+                  :timeout timeout)
       (let ((marshalized-body (marshal
                                table
                                (apply handle-dsm-body
@@ -114,11 +118,13 @@
 (define (dsm-read protocol input . keywords)
   (let-keywords* keywords ((eof-handler (lambda () "Got eof"))
                            (not-response-handler
-                            (lambda () (error "not response"))))
+                            (lambda () (error "not response")))
+                           (timeout (list 15 0)))
     (define (read-header)
       (debug (list "reading header..."))
       (let ((header (dsm-read-header protocol input
-                                     eof-handler not-response-handler)))
+                                     eof-handler not-response-handler
+                                     timeout)))
         (debug header)
         (if (eof-object? header)
           (eof-handler)
@@ -128,7 +134,8 @@
       (debug (list "reading body..."))
       (read-from-string (ces-convert
                          (dsm-read-body protocol header input
-                                        eof-handler not-response-handler)
+                                        eof-handler not-response-handler
+                                        timeout)
                          (encoding-of header))))
 
     (debug (list "reading..." input))

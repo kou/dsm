@@ -19,9 +19,9 @@
                dsmp-delimiter))
 
 (define-method dsm-read-header
-    ((self <dsmp>) input eof-handler not-response-handler)
+    ((self <dsmp>) input eof-handler not-response-handler timeout)
   (define counter 3)
-  (read-with-timeout input read-line (list 10 0)
+  (read-with-timeout input read-line timeout
                      (lambda (retry)
                        (dec! counter)
                        (if (> counter 0)
@@ -29,9 +29,9 @@
                          (not-response-handler)))))
 
 (define-method dsm-read-body
-    ((self <dsmp>) header input eof-handler not-response-handler)
+    ((self <dsmp>) header input eof-handler not-response-handler timeout)
   (read-required-block input (size-of header)
-                       eof-handler not-response-handler))
+                       eof-handler not-response-handler timeout))
 
 (define-method dsm-write-header ((self <dsmp>) header output)
   (display header output)
