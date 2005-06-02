@@ -384,26 +384,29 @@
       (thread-pool-push!
        (thread-pool-of self)
        (lambda ()
-         (call/cc
-          (lambda (cont)
-            (dsm-response (protocol-of self)
-                          (marshal-table-of self)
-                          input output
-                          :get-handler (cut get-by-mount-point self <>)
-                          :eof-handler (cut (make-eof-handler cont)
-                                            client input output)
-                          :not-response-handler
-                          (lambda ()
-                            (print "not resposne from client")
-                            (cont 0))
-                          :timeout #f)
-            ;; (p "SELECTOR")
-            (selector-add! selector
-                           input
-                           (lambda (in flag)
-                             (selector-delete! selector in #f #f)
-                             (handle-dsm-protocol client in output))
-                           '(r)))))))
+         (with-error-handler
+             report-error
+           (lambda ()
+             (call/cc
+              (lambda (cont)
+                (dsm-response (protocol-of self)
+                              (marshal-table-of self)
+                              input output
+                              :get-handler (cut get-by-mount-point self <>)
+                              :eof-handler (cut (make-eof-handler cont)
+                                                client input output)
+                              :not-response-handler
+                              (lambda ()
+                                (print "not response from client")
+                                (cont 0))
+                              :timeout #f)
+                ;; (p "SELECTOR")
+                (selector-add! selector
+                               input
+                               (lambda (in flag)
+                                 (selector-delete! selector in #f #f)
+                                 (handle-dsm-protocol client in output))
+                               '(r)))))))))
 
     (define (make-eof-handler return)
       (lambda (client input output)
