@@ -45,6 +45,7 @@ GPL or BSD License
 
 == 依存ライブラリ
 
+  * ((<Gauche|URL:http://www.shiro.dreamhost.com/scheme/gauche/>)) >= 0.8.4
   * ((<msm|URL:http://www.cozmixng.org/~rwiki/?cmd=view;name=msm>))
 
 == 入手方法
