@@ -36,7 +36,7 @@
   `(("proc-in-col2" ((dummy ,(lambda () #t))) (#t) ())))
 
 (define error-procedure-list
-  ; (mount-point proc-which-couse-error arg ...)
+  ;; (mount-point proc-which-couse-error arg ...)
   `(("error-proc1" ,(lambda () (1))
                    #/^invalid application: \(1\)/)
     ("error-proc2" ,(lambda (procs . args) 

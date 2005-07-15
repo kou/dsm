@@ -2,6 +2,6 @@
   (export *dsm-version*))
 (select-module dsm.dsm)
 
-(define *dsm-version* "0.0.2")
+(define *dsm-version* "0.0.3")
 
 (provide "dsm/dsm")

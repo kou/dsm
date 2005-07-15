@@ -14,19 +14,17 @@
   (define (show-error message stack-trace)
     (display (format "~a\n" message)
              (current-error-port))
-    (with-module gauche.vm.debugger
-      (debug-print-stack stack-trace
-                         *stack-show-depth*)))
+    (show-stack-trace stack-trace))
+  
   (define (raise-if-error obj)
     (if (dsm-error? obj)
-        (error (with-output-to-string
-                 (lambda ()
-                   (with-error-to-port
-                    (current-output-port)
-                    (lambda ()
-                      (show-error (message-of obj)
-                                  (stack-trace-of obj)))))))
-        obj))
+      (error (with-output-to-string
+               (lambda ()
+                 (with-error-to-port (current-output-port)
+                   (lambda ()
+                     (show-error (message-of obj)
+                                 (stack-trace-of obj)))))))
+      obj))
   
   (let-keywords* keywords ((command "get")
                            (get-handler raise-if-error)
