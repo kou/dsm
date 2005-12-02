@@ -52,7 +52,7 @@
     (lambda args
       (let-optionals* args ((mount-point #f))
         (if mount-point
-          (if (eq? 'CONNECTED (socket-status socket))
+          (if (member (socket-status socket) '(CONNECTED connected))
             (apply dsm-request
                    (protocol-of client)
                    (marshal table mount-point)
