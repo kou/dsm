@@ -12,6 +12,10 @@ Kouhei Sutou <kou@cozmixng.org>
 
 GPL or BSD License
 
+== 注意
+
+以前のバージョンはGauche 0.8.6以降では動きません．
+
 == メーリングリスト
 
 ((<COZMIXNG RWiki - 連絡先
